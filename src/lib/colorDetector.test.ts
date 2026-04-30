@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   classifyColor,
+  classifyColorWithConfidence,
   rgbToLab,
   deltaE,
   saveCalibration,
@@ -79,8 +80,24 @@ describe('colorDetector', () => {
     });
   });
 
+  describe('classifyColorWithConfidence', () => {
+    it('should return high confidence for clear matches', () => {
+      const result = classifyColorWithConfidence(255, 255, 255);
+      expect(result.color).toBe('U');
+      expect(result.confidence).toBeGreaterThan(0.8);
+    });
+
+    it('should return low confidence for ambiguous colors', () => {
+      // Something between Red and Orange
+      // Red: { L: 53, a: 80, b: 67 }
+      // Orange: { L: 67, a: 51, b: 82 }
+      const result = classifyColorWithConfidence(255, 100, 40); 
+      expect(result.confidence).toBeLessThan(0.6);
+    });
+  });
+
   describe('extract9Cells', () => {
-    it('should extract colors from 9 different regions of the canvas', () => {
+    it('should extract colors and confidence from 9 different regions', () => {
       // Mock getImageData to return different colors based on coordinates
       const mockCtx = {
         getImageData: vi.fn((x, y) => {
@@ -104,6 +121,8 @@ describe('colorDetector', () => {
 
       const results = extract9Cells(mockCtx, corners);
       expect(results).toHaveLength(9);
+      expect(results[0]).toHaveProperty('confidence');
+      expect(results[0]).toHaveProperty('distance');
       
       // Top row (index 0,1,2) should be U (White)
       expect(results[0].color).toBe('U');

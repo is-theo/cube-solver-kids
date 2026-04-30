@@ -74,21 +74,52 @@ const DEFAULT_REFERENCES: Record<CubeColor, Lab> = {
  * Lab 색공간 기반 분류
  */
 export function classifyColor(r: number, g: number, b: number, calibration?: CalibrationData): CubeColor {
+  const { color } = classifyColorWithConfidence(r, g, b, calibration);
+  return color;
+}
+
+export interface ClassificationResult {
+  color: CubeColor;
+  distance: number;
+  confidence: number;
+}
+
+/**
+ * Lab 색공간 기반 분류 + 확신도(Confidence) 계산
+ * confidence: (두 번째로 가까운 거리 - 가장 가까운 거리) / 두 번째로 가까운 거리
+ * 0에 가까울수록 모호하고, 1에 가까울수록 확실함.
+ */
+export function classifyColorWithConfidence(
+  r: number,
+  g: number,
+  b: number,
+  calibration?: CalibrationData
+): ClassificationResult {
   const currentLab = rgbToLab(r, g, b);
   const references = { ...DEFAULT_REFERENCES, ...(calibration?.references || {}) };
 
-  let minDistance = Infinity;
-  let closest: CubeColor = 'U';
+  let bestColor: CubeColor = 'U';
+  let bestDistance = Infinity;
+  let secondDistance = Infinity;
 
   (Object.keys(references) as CubeColor[]).forEach((color) => {
     const dist = deltaE(currentLab, references[color]!);
-    if (dist < minDistance) {
-      minDistance = dist;
-      closest = color;
+    if (dist < bestDistance) {
+      secondDistance = bestDistance;
+      bestDistance = dist;
+      bestColor = color;
+    } else if (dist < secondDistance) {
+      secondDistance = dist;
     }
   });
 
-  return closest;
+  const confidence = secondDistance === Infinity ? 1 : (secondDistance - bestDistance) / secondDistance;
+
+  return {
+    color: bestColor,
+    distance: bestDistance,
+    confidence: Math.max(0, Math.min(1, confidence)),
+  };
 }
 
 export interface Point {
@@ -103,8 +134,8 @@ export function extract9Cells(
   ctx: CanvasRenderingContext2D,
   corners: [Point, Point, Point, Point], // TL, TR, BR, BL
   calibration?: CalibrationData
-): { color: CubeColor; rgb: [number, number, number]; lab: Lab }[] {
-  const result: { color: CubeColor; rgb: [number, number, number]; lab: Lab }[] = [];
+): { color: CubeColor; rgb: [number, number, number]; lab: Lab; confidence: number; distance: number }[] {
+  const result: { color: CubeColor; rgb: [number, number, number]; lab: Lab; confidence: number; distance: number }[] = [];
 
   for (let row = 0; row < 3; row++) {
     for (let col = 0; col < 3; col++) {
@@ -126,8 +157,8 @@ export function extract9Cells(
 
       const sampleSize = 5;
       const data = ctx.getImageData(
-        Math.floor(x - sampleSize / 2),
-        Math.floor(y - sampleSize / 2),
+        Math.max(0, Math.floor(x - sampleSize / 2)),
+        Math.max(0, Math.floor(y - sampleSize / 2)),
         sampleSize,
         sampleSize
       ).data;
@@ -143,10 +174,14 @@ export function extract9Cells(
       const avgG = g / pixelCount;
       const avgB = b / pixelCount;
 
+      const classification = classifyColorWithConfidence(avgR, avgG, avgB, calibration);
+
       result.push({
-        color: classifyColor(avgR, avgG, avgB, calibration),
+        color: classification.color,
         rgb: [Math.round(avgR), Math.round(avgG), Math.round(avgB)],
         lab: rgbToLab(avgR, avgG, avgB),
+        confidence: classification.confidence,
+        distance: classification.distance,
       });
     }
   }
