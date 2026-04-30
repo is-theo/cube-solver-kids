@@ -15,11 +15,11 @@ export const COLOR_HEX: Record<CubeColor, string> = {
 
 export const COLOR_NAME_KR: Record<CubeColor, string> = {
   U: '흰색',
-  R: '빨강',
-  F: '초록',
-  D: '노랑',
-  L: '주황',
-  B: '파랑',
+  R: '빨간색',
+  F: '초록색',
+  D: '노란색',
+  L: '주황색',
+  B: '파란색',
 };
 
 export type { Lab };
