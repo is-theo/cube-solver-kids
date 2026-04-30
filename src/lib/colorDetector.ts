@@ -31,17 +31,44 @@ export interface CalibrationData {
 
 const STORAGE_KEY = 'rubiks_calibration';
 
-export function saveCalibration(data: CalibrationData) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+function hasLocalStorage(): boolean {
+  return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
+}
+
+export function saveCalibration(data: CalibrationData): boolean {
+  if (!hasLocalStorage()) return false;
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    return true;
+  } catch {
+    // QuotaExceededError, SecurityError(private mode), etc.
+    return false;
+  }
 }
 
 export function loadCalibration(): CalibrationData | null {
-  const saved = localStorage.getItem(STORAGE_KEY);
+  if (!hasLocalStorage()) return null;
+  let saved: string | null;
+  try {
+    saved = window.localStorage.getItem(STORAGE_KEY);
+  } catch {
+    return null;
+  }
   if (!saved) return null;
   try {
     return JSON.parse(saved);
   } catch {
     return null;
+  }
+}
+
+export function clearCalibration(): boolean {
+  if (!hasLocalStorage()) return false;
+  try {
+    window.localStorage.removeItem(STORAGE_KEY);
+    return true;
+  } catch {
+    return false;
   }
 }
 
