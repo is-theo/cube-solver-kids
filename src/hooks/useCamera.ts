@@ -43,14 +43,16 @@ export function useCamera(): UseCameraResult {
           await videoRef.current.play();
           setReady(true);
         }
-      } catch (e: any) {
-        if (cancelled || e.name === 'AbortError') return;
+      } catch (e: unknown) {
+        if (cancelled) return;
+        const err = e as Error;
+        if (err.name === 'AbortError') return;
         const msg =
-          e.name === 'NotAllowedError'
+          err.name === 'NotAllowedError'
             ? '카메라 권한이 필요해! 브라우저에서 허용해줘 📷'
-            : e.name === 'NotFoundError'
+            : err.name === 'NotFoundError'
             ? '카메라를 찾을 수 없어요 😢'
-            : `카메라를 켤 수 없어요: ${e.message}`;
+            : `카메라를 켤 수 없어요: ${err.message}`;
         setError(msg);
       }
     }

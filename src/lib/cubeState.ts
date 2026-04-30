@@ -59,6 +59,12 @@ export interface ValidationResult {
   error?: string;
 }
 
+export function getKoreanParticle(name: string): string {
+  const lastChar = name.charCodeAt(name.length - 1);
+  if (lastChar < 0xac00 || lastChar > 0xd7a3) return '로';
+  return (lastChar - 0xac00) % 28 > 0 ? '으로' : '로';
+}
+
 export function validateCubeState(state: CubeState): ValidationResult {
   if (!isComplete(state)) {
     return { valid: false, error: '아직 모든 면을 다 보여주지 않았어요' };
@@ -76,9 +82,10 @@ export function validateCubeState(state: CubeState): ValidationResult {
   }
   for (const colorKey of FACE_ORDER) {
     if (counts[colorKey] !== 9) {
+      const colorName = COLOR_NAME_KR[colorKey];
       return {
         valid: false,
-        error: `${COLOR_NAME_KR[colorKey]} 칸이 ${counts[colorKey]}개로 잘못 인식됐어요 (9개 필요)`,
+        error: `${colorName}${getKoreanParticle(colorName)} 잘못 인식된 칸이 ${counts[colorKey]}개 있어요 (9개 필요)`,
       };
     }
   }
@@ -88,11 +95,9 @@ export function validateCubeState(state: CubeState): ValidationResult {
     const faceColors = state.faces[faceKey];
     if (faceColors && faceColors[4] !== faceKey) {
       const colorName = COLOR_NAME_KR[faceColors[4] as CubeColor];
-      // 받침이 있으면 '으로', 없으면 '로' (빨강은 받침 'ㅇ'이 있으므로 '으로')
-      const particle = (colorName.charCodeAt(colorName.length - 1) - 0xac00) % 28 > 0 ? '으로' : '로';
       return {
         valid: false,
-        error: `${FACE_NAME_KR[faceKey]} 중앙이 ${colorName}${particle} 잘못 인식됐어요`,
+        error: `${FACE_NAME_KR[faceKey]} 중앙이 ${colorName}${getKoreanParticle(colorName)} 잘못 인식됐어요`,
       };
     }
   }

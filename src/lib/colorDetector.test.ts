@@ -53,5 +53,19 @@ describe('colorDetector', () => {
       // Even dark gray should be classified as U with this calibration
       expect(classifyColor(20, 20, 20, customCalibration)).toBe('U');
     });
+
+    it('should fall back to default references for missing calibration keys', () => {
+      // Only calibrate Red, others should use defaults
+      const partialCalibration: CalibrationData = {
+        references: {
+          R: { l: 10, a: 0, b: 0 }, // Fake Red (Dark)
+        } as any
+      };
+      
+      // Red should use custom
+      expect(classifyColor(20, 20, 20, partialCalibration)).toBe('R');
+      // White should still use default
+      expect(classifyColor(255, 255, 255, partialCalibration)).toBe('U');
+    });
   });
 });

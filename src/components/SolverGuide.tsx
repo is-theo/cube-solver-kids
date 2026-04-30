@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { CubeViewer3D } from './CubeViewer3D';
-import { moveToKorean } from '../lib/cubeState';
+import { moveToKorean, getKoreanParticle } from '../lib/cubeState';
 import type { CubeColor } from '../lib/colorDetector';
 
 interface SolverGuideProps {
@@ -59,7 +59,7 @@ export function SolverGuide({ faces, solution, onRestart }: SolverGuideProps) {
             <span className="move-face">{moveInfo.face}</span>을<br />
             <span className="move-direction">
               {moveInfo.direction}
-              {moveInfo.turns === 2 ? '' : '으로 한 번'}
+              {moveInfo.turns === 2 ? '' : `${getKoreanParticle(moveInfo.direction)} 한 번`}
             </span>{' '}
             돌려줘!
           </div>

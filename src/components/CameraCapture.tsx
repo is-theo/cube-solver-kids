@@ -84,8 +84,11 @@ export function CameraCapture({ targetFace, instructionText, onCaptured, onSkip 
   const handleCalibrationCapture = () => {
     if (!livePreview || !calibStep) return;
     const centerLab = livePreview[4].lab;
-    const nextRefs = { ...(calibration?.references || {}), [calibStep]: centerLab };
-    const nextCalib = { references: nextRefs as any };
+    const nextRefs: Record<CubeColor, Lab> = { 
+      ...(calibration?.references || {}), 
+      [calibStep]: centerLab 
+    } as Record<CubeColor, Lab>;
+    const nextCalib: CalibrationData = { references: nextRefs };
     setCalibration(nextCalib);
 
     // 다음 색상 순서: U -> R -> F -> D -> L -> B

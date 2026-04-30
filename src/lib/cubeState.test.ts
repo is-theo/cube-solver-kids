@@ -56,7 +56,7 @@ describe('cubeState', () => {
     
     const result = validateCubeState(state);
     expect(result.valid).toBe(false);
-    expect(result.error).toContain('흰색 칸이 8개로 잘못 인식됐어요');
+    expect(result.error).toContain('흰색으로 잘못 인식된 칸이 8개 있어요');
   });
 
   it('should fail validation if centers are wrong', () => {
@@ -71,8 +71,9 @@ describe('cubeState', () => {
     };
     
     // Adjust one R to U to pass count check
-    if (state.faces.R) {
-      state.faces.R[0] = 'U';
+    const rFace = state.faces.R;
+    if (rFace) {
+      rFace[0] = 'U';
     }
     
     const result = validateCubeState(state);
