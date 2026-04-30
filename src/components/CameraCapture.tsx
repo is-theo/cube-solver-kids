@@ -187,8 +187,8 @@ export function CameraCapture({ targetFace, instructionText, onCaptured, onSkip 
                 중앙이 <b>{COLOR_NAME_KR[targetFace]}</b>이어야 해요!
               </span>
             )}
-            {centerOk && stableFrames < 8 && <span className="status-tip">큐브를 가만히 들어줘 ✋</span>}
-            {centerOk && stableFrames >= 8 && countdown !== null && countdown > 0 && (
+            {centerOk && !stable && <span className="status-tip">큐브를 가만히 들어줘 ✋</span>}
+            {centerOk && stable && countdown !== null && countdown > 0 && (
               <span className="status-go">곧 찰칵! 📸</span>
             )}
           </div>

@@ -28,6 +28,14 @@ npm run dev
 
 브라우저에서 http://localhost:5173 접속.
 
+## 🧪 테스트
+
+Vitest를 사용하여 핵심 로직을 테스트합니다.
+
+```bash
+npm test
+```
+
 > ⚠️ **카메라는 HTTPS 또는 localhost에서만 동작**합니다.
 > 모바일에서 테스트하려면 `vite --host`로 띄우고 PC에서 ngrok 등 HTTPS 터널 사용을 권장.
 
