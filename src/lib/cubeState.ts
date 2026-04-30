@@ -103,7 +103,7 @@ export function validateCubeState(state: CubeState): ValidationResult {
   }
 
   if (errors.length > 0) {
-    return { valid: false, error: errors[0] }; // 가장 중요한 첫 번째 에러 반환
+    return { valid: false, error: errors.join('\n') };
   }
 
   return { valid: true };
