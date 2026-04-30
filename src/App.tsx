@@ -69,10 +69,6 @@ export default function App() {
       setValidationError(result.error || '큐브 상태가 이상해요');
       return;
     }
-    if (!isComplete(cubeState)) {
-      setValidationError('아직 모든 면을 다 보여주지 않았어요');
-      return;
-    }
     setValidationError(null);
     setPhase('solving');
     setSolverError(null);
@@ -87,8 +83,9 @@ export default function App() {
         setSolution(sol);
       }
       setPhase('solution');
-    } catch (e: any) {
-      setSolverError(`풀이 중 문제가 생겼어요: ${e.message || '알 수 없는 오류'}`);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : '알 수 없는 오류';
+      setSolverError(`풀이 중 문제가 생겼어요: ${msg}`);
       setPhase('review');
     }
   };
