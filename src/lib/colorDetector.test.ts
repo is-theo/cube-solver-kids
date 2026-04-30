@@ -50,6 +50,31 @@ describe('colorDetector', () => {
       expect(classifyColor(0, 119, 182)).toBe('B');   // Blue-ish
     });
 
+    it('should distinguish between Red and Orange even when colors are similar', () => {
+      // Standard Red: (255, 0, 0), Standard Orange: (255, 165, 0)
+      const reddishOrange = [255, 80, 0]; // Closer to red or orange?
+      // In Lab, this should be closer to our Orange or Red reference
+      // Let's test the boundary
+      expect(classifyColor(255, 40, 0)).toBe('R');
+      expect(classifyColor(255, 120, 0)).toBe('L');
+    });
+
+    it('should distinguish between White and Yellow in different lighting', () => {
+      // Dim white can look like bright yellow in RGB, but Lab L channel helps
+      const dimWhite = [180, 180, 180];
+      const brightYellow = [255, 255, 100];
+      
+      expect(classifyColor(dimWhite[0], dimWhite[1], dimWhite[2])).toBe('U');
+      expect(classifyColor(brightYellow[0], brightYellow[1], brightYellow[2])).toBe('D');
+    });
+
+    it('should handle very dark colors (shadows) gracefully', () => {
+      // Very dark blue
+      expect(classifyColor(10, 10, 50)).toBe('B');
+      // Very dark red
+      expect(classifyColor(50, 10, 10)).toBe('R');
+    });
+
     it('should handle calibration data', () => {
       const customCalibration: CalibrationData = {
         references: {
