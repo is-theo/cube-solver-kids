@@ -7,6 +7,7 @@ import {
   FACE_INSTRUCTION_KR,
   createEmptyCubeState,
   isComplete,
+  initSolver,
   toFaceletString,
   validateCubeState,
   solveCube,
@@ -126,7 +127,11 @@ export default function App() {
             </ol>
             <button
               className="btn-primary btn-large"
-              onClick={() => setPhase('capturing')}
+              onClick={() => {
+                // 솔버 예열: cubejs 테이블 생성에 ~5초 소요. 캡처 중 백그라운드에서 진행하면 마지막 대기가 사라진다.
+                initSolver().catch(() => {});
+                setPhase('capturing');
+              }}
             >
               시작하기 🚀
             </button>
