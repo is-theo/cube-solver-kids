@@ -18,11 +18,20 @@ export function FaceReview({ faces, onChange, onConfirm, onRetake, validationErr
 
   useEffect(() => {
     if (!editingCell) return;
+    
+    // Scroll lock
+    const originalStyle = window.getComputedStyle(document.body).overflow;
+    document.body.style.overflow = 'hidden';
+
     const handleEsc = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setEditingCell(null);
     };
     window.addEventListener('keydown', handleEsc);
-    return () => window.removeEventListener('keydown', handleEsc);
+    
+    return () => {
+      document.body.style.overflow = originalStyle;
+      window.removeEventListener('keydown', handleEsc);
+    };
   }, [editingCell]);
 
   const modal = editingCell && (

@@ -6,8 +6,9 @@
 ## ✨ 기능
 
 - 📷 **카메라로 6면 순차 캡처** (안정화되면 자동 카운트다운)
-- 🎨 **9칸 색상 자동 인식** (CIE Lab 색공간 및 Delta E 76 거리 기반)
+- 🎨 **9칸 색상 자동 인식** (CIE Lab 색공간 및 Delta E 2000 거리 기반)
   - sRGB를 선형화한 후 D65 광원 기준 XYZ를 거쳐 Lab으로 변환하여 조명 변화에 강함
+  - Delta E 76보다 정교한 **Delta E 2000** 공식을 기본으로 사용
   - 6면 주위 환경에 맞춘 **사용자 캘리브레이션** 기능 제공 (localStorage 저장)
 - ✏️ **인식 결과 수동 수정** 가능 (틀린 칸 탭해서 색 바꾸기)
 - 🪄 **Kociemba 솔버** (cubejs)로 평균 20수 이내 풀이
@@ -68,9 +69,14 @@ src/
 │   └── useCamera.ts         # WebRTC 카메라 훅 (노출/화이트밸런스 고정 지원)
 ├── lib/
 │   ├── colorDetector.ts     # RGB → Lab → 6색 분류 (Calibration 지원)
-│   └── cubeState.ts         # 큐브 상태 + cubejs 솔버 래퍼
+│   ├── colorDetector.test.ts # 색 인식 테스트
+│   ├── colorSpace.ts        # sRGB-Lab 변환 및 DeltaE 공식
+│   ├── cubeState.ts         # 큐브 상태 + cubejs 솔버 래퍼
+│   └── cubeState.test.ts    # 상태 검증 및 솔버 테스트
 ├── styles/
 │   └── global.css
+├── types/
+│   └── cubejs.d.ts          # cubejs 라이브러리 타입 정의
 ├── App.tsx                  # 전체 흐름 제어 (state machine)
 └── main.tsx
 ```

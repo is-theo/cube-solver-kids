@@ -5,8 +5,8 @@ interface UseCameraResult {
   ready: boolean;
   error: string | null;
   retry: () => void;
-  lockCamera: () => Promise<void>;
-  unlockCamera: () => Promise<void>;
+  lockCamera: () => Promise<boolean>;
+  unlockCamera: () => Promise<boolean>;
 }
 
 export function useCamera(): UseCameraResult {
@@ -67,10 +67,10 @@ export function useCamera(): UseCameraResult {
     };
   }, [attempt]);
 
-  const setCameraLock = async (locked: boolean) => {
-    if (!streamRef.current) return;
+  const setCameraLock = async (locked: boolean): Promise<boolean> => {
+    if (!streamRef.current) return false;
     const track = streamRef.current.getVideoTracks()[0];
-    if (!track) return;
+    if (!track) return false;
 
     interface ExtendedCapabilities extends MediaTrackCapabilities {
       exposureMode?: string[];
@@ -94,10 +94,13 @@ export function useCamera(): UseCameraResult {
     if (Object.keys(constraints).length > 0) {
       try {
         await track.applyConstraints({ advanced: [constraints] });
+        return true;
       } catch (e) {
         console.warn('Failed to apply camera constraints', e);
+        return false;
       }
     }
+    return false;
   };
 
   return {
