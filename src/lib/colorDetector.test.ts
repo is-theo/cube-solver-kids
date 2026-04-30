@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { classifyColor, rgbToLab, deltaE, saveCalibration, loadCalibration, type CalibrationData, type CubeColor, type Lab } from './colorDetector';
+import { classifyColor, rgbToLab, deltaE, saveCalibration, loadCalibration, type CalibrationData } from './colorDetector';
 
 describe('colorDetector', () => {
   beforeEach(() => {

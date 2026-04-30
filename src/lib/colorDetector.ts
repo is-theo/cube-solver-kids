@@ -1,4 +1,4 @@
-import { Lab, rgbToLab, deltaE76 } from './colorSpace';
+import { Lab, rgbToLab, deltaE2000 } from './colorSpace';
 
 // 큐브 색상 6가지 (cubejs 표준 표기)
 export type CubeColor = 'U' | 'R' | 'F' | 'D' | 'L' | 'B';
@@ -26,7 +26,7 @@ export type { Lab };
 export { rgbToLab };
 
 export interface CalibrationData {
-  references: Record<CubeColor, Lab>;
+  references: Partial<Record<CubeColor, Lab>>;
 }
 
 const STORAGE_KEY = 'rubiks_calibration';
@@ -46,10 +46,11 @@ export function loadCalibration(): CalibrationData | null {
 }
 
 /**
- * Delta E (CIE76) - colorSpace.ts의 deltaE76 재사용
+ * Delta E (CIEDE2000) - colorSpace.ts의 deltaE2000 재사용
+ * 주황(L)/빨강(R) 같은 인접 색상 구분 정확도가 deltaE76보다 높음.
  */
 export function deltaE(lab1: Lab, lab2: Lab): number {
-  return deltaE76(lab1, lab2);
+  return deltaE2000(lab1, lab2);
 }
 
 // 기본 참조값 (D65 기준 대략적인 Lab 값들)
