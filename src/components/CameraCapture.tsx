@@ -12,67 +12,96 @@ interface CameraCaptureProps {
 
 const GRID_SIZE_RATIO = 0.55; // 화면 짧은 변 대비 그리드 크기
 
+type LivePreviewCell = { color: CubeColor; rgb: [number, number, number] };
+
+const LIVE_PREVIEW_THROTTLE_MS = 180;
+const STABLE_FRAMES_TO_TRIGGER = 8;
+
 export function CameraCapture({ targetFace, instructionText, onCaptured, onSkip }: CameraCaptureProps) {
   const { videoRef, ready, error, retry } = useCamera();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
-  const [livePreview, setLivePreview] = useState<{ color: CubeColor; rgb: [number, number, number] }[] | null>(null);
-  const [stableFrames, setStableFrames] = useState(0);
+
+  const [livePreview, setLivePreview] = useState<LivePreviewCell[] | null>(null);
+  const [stable, setStable] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [captured, setCaptured] = useState(false);
+
+  // 매 프레임 변경되는 값은 ref 로 관리해 리렌더링을 피한다
+  const stableFramesRef = useRef(0);
   const lastColorsRef = useRef<string>('');
+  const lastPreviewPushRef = useRef<number>(0);
+  const rafRef = useRef<number>(0);
+
+  // targetFace 가 바뀌면 누적 상태 초기화
+  useEffect(() => {
+    stableFramesRef.current = 0;
+    lastColorsRef.current = '';
+    lastPreviewPushRef.current = 0;
+    setStable(false);
+    setLivePreview(null);
+    setCountdown(null);
+  }, [targetFace]);
 
   // 메인 분석 루프
   useEffect(() => {
     if (!ready || captured) return;
-    let stop = false;
+    let stopped = false;
 
     const tick = () => {
-      if (stop) return;
+      if (stopped) return;
       const video = videoRef.current;
       const canvas = canvasRef.current;
       const overlay = overlayCanvasRef.current;
       if (!video || !canvas || !overlay || video.videoWidth === 0) {
-        requestAnimationFrame(tick);
+        rafRef.current = requestAnimationFrame(tick);
         return;
       }
 
       const vw = video.videoWidth;
       const vh = video.videoHeight;
-      canvas.width = vw;
-      canvas.height = vh;
-      overlay.width = vw;
-      overlay.height = vh;
+      if (canvas.width !== vw || canvas.height !== vh) {
+        canvas.width = vw;
+        canvas.height = vh;
+        overlay.width = vw;
+        overlay.height = vh;
+      }
 
       const ctx = canvas.getContext('2d', { willReadFrequently: true });
       const octx = overlay.getContext('2d');
       if (!ctx || !octx) {
-        requestAnimationFrame(tick);
+        rafRef.current = requestAnimationFrame(tick);
         return;
       }
 
       ctx.drawImage(video, 0, 0, vw, vh);
 
-      // 9칸 그리드 영역
       const minDim = Math.min(vw, vh);
       const gridSize = minDim * GRID_SIZE_RATIO;
       const gx = (vw - gridSize) / 2;
       const gy = (vh - gridSize) / 2;
 
-      // 색상 추출
       const cells = extract9CellsWithRgb(ctx, gx, gy, gridSize);
-      setLivePreview(cells);
 
-      // 안정성 체크 (3프레임 연속 같은 색이면 안정)
+      // 안정성 체크 (ref 사용 → 매 프레임 setState 폭주 제거)
       const colorsKey = cells.map((c) => c.color).join('');
       if (colorsKey === lastColorsRef.current) {
-        setStableFrames((f) => f + 1);
+        stableFramesRef.current += 1;
       } else {
-        setStableFrames(0);
+        stableFramesRef.current = 0;
         lastColorsRef.current = colorsKey;
       }
+      const isStable = stableFramesRef.current >= STABLE_FRAMES_TO_TRIGGER;
+      setStable((prev) => (prev !== isStable ? isStable : prev));
 
-      // 오버레이 그리기 (격자)
+      // livePreview 는 ~180ms 주기로만 업데이트
+      const now = performance.now();
+      if (now - lastPreviewPushRef.current >= LIVE_PREVIEW_THROTTLE_MS) {
+        lastPreviewPushRef.current = now;
+        setLivePreview(cells);
+      }
+
+      // 오버레이 그리기
       octx.clearRect(0, 0, vw, vh);
       octx.strokeStyle = 'rgba(255, 255, 255, 0.95)';
       octx.lineWidth = 4;
@@ -91,28 +120,28 @@ export function CameraCapture({ targetFace, instructionText, onCaptured, onSkip 
         octx.stroke();
       }
 
-      requestAnimationFrame(tick);
+      rafRef.current = requestAnimationFrame(tick);
     };
-    requestAnimationFrame(tick);
+    rafRef.current = requestAnimationFrame(tick);
 
     return () => {
-      stop = true;
+      stopped = true;
+      cancelAnimationFrame(rafRef.current);
     };
-  }, [ready, captured]);
+  }, [ready, captured, videoRef]);
 
   // 안정화 → 카운트다운 → 캡처
   useEffect(() => {
     if (captured || !livePreview) return;
 
-    // 중앙 색이 타겟과 일치할 때만 진행 (실수로 잘못된 면 캡처 방지)
     const centerOk = livePreview[4].color === targetFace;
 
-    if (stableFrames >= 8 && centerOk && countdown === null) {
+    if (stable && centerOk && countdown === null) {
       setCountdown(3);
-    } else if (stableFrames < 4 && countdown !== null) {
+    } else if (!stable && countdown !== null) {
       setCountdown(null);
     }
-  }, [stableFrames, livePreview, targetFace, captured, countdown]);
+  }, [stable, livePreview, targetFace, captured, countdown]);
 
   // 카운트다운 진행
   useEffect(() => {

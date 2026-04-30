@@ -50,15 +50,25 @@ function getStickerLocalPosition(idx: number): [number, number] {
   return [x, y];
 }
 
+type StickerMesh = THREE.Mesh<THREE.PlaneGeometry, THREE.MeshStandardMaterial>;
+type ArrowMesh = THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>;
+
+const EMPTY_STICKER_HEX = '#1a1a1a';
+
 export function CubeViewer3D({ faces, highlightMove }: CubeViewer3DProps) {
   const mountRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const cubeGroupRef = useRef<THREE.Group | null>(null);
   const arrowGroupRef = useRef<THREE.Group | null>(null);
+  const stickerMeshesRef = useRef<Record<CubeColor, StickerMesh[]>>({
+    U: [], R: [], F: [], D: [], L: [], B: [],
+  });
+  const arrowMeshesRef = useRef<ArrowMesh[]>([]);
+  const blinkFrameRef = useRef<number>(0);
   const animFrameRef = useRef<number>(0);
 
-  // 1회 초기 설정
+  // 1회 초기 설정 (스티커도 여기서 한번만 생성)
   useEffect(() => {
     if (!mountRef.current) return;
     const mount = mountRef.current;
@@ -79,7 +89,6 @@ export function CubeViewer3D({ faces, highlightMove }: CubeViewer3DProps) {
     mount.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
-    // 조명
     const ambient = new THREE.AmbientLight(0xffffff, 0.85);
     scene.add(ambient);
     const dir = new THREE.DirectionalLight(0xffffff, 0.6);
@@ -89,23 +98,45 @@ export function CubeViewer3D({ faces, highlightMove }: CubeViewer3DProps) {
     dir2.position.set(-5, -3, -5);
     scene.add(dir2);
 
-    // 큐브 그룹
     const cubeGroup = new THREE.Group();
     scene.add(cubeGroup);
     cubeGroupRef.current = cubeGroup;
 
-    // 검정 코어 (3x3x3 중심부)
     const coreGeo = new THREE.BoxGeometry(2.95, 2.95, 2.95);
     const coreMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.6 });
     const core = new THREE.Mesh(coreGeo, coreMat);
     cubeGroup.add(core);
 
-    // 화살표 그룹
+    // 스티커 54개를 한 번만 생성하고 ref 에 보관 (faces 변경 시 색만 update)
+    const stickerMeshes: Record<CubeColor, StickerMesh[]> = {
+      U: [], R: [], F: [], D: [], L: [], B: [],
+    };
+    FACE_ORDER.forEach((face) => {
+      const transform = getFaceTransforms(face);
+      const faceGroup = new THREE.Group();
+      faceGroup.position.set(...transform.position);
+      faceGroup.rotation.set(...transform.rotation);
+      for (let i = 0; i < 9; i++) {
+        const stickerGeo = new THREE.PlaneGeometry(STICKER_SIZE, STICKER_SIZE);
+        const stickerMat = new THREE.MeshStandardMaterial({
+          color: new THREE.Color(EMPTY_STICKER_HEX),
+          roughness: 0.35,
+          metalness: 0.05,
+        });
+        const sticker = new THREE.Mesh(stickerGeo, stickerMat) as StickerMesh;
+        const [x, y] = getStickerLocalPosition(i);
+        sticker.position.set(x, y, 0);
+        faceGroup.add(sticker);
+        stickerMeshes[face].push(sticker);
+      }
+      cubeGroup.add(faceGroup);
+    });
+    stickerMeshesRef.current = stickerMeshes;
+
     const arrowGroup = new THREE.Group();
     scene.add(arrowGroup);
     arrowGroupRef.current = arrowGroup;
 
-    // 자동 회전 애니메이션
     let lastTime = performance.now();
     const animate = (now: number) => {
       const dt = (now - lastTime) / 1000;
@@ -114,7 +145,6 @@ export function CubeViewer3D({ faces, highlightMove }: CubeViewer3DProps) {
         cubeGroupRef.current.rotation.y += dt * 0.3;
       }
       if (arrowGroupRef.current) {
-        // 화살표는 큐브와 함께 돌아야 함
         arrowGroupRef.current.rotation.y = cubeGroupRef.current?.rotation.y ?? 0;
       }
       renderer.render(scene, camera);
@@ -122,7 +152,6 @@ export function CubeViewer3D({ faces, highlightMove }: CubeViewer3DProps) {
     };
     animFrameRef.current = requestAnimationFrame(animate);
 
-    // 리사이즈
     const handleResize = () => {
       if (!mountRef.current) return;
       const w = mountRef.current.clientWidth;
@@ -135,47 +164,43 @@ export function CubeViewer3D({ faces, highlightMove }: CubeViewer3DProps) {
 
     return () => {
       cancelAnimationFrame(animFrameRef.current);
+      cancelAnimationFrame(blinkFrameRef.current);
       window.removeEventListener('resize', handleResize);
+
+      // 모든 자식의 geometry/material 해제
+      scene.traverse((obj) => {
+        if ((obj as THREE.Mesh).isMesh) {
+          const mesh = obj as THREE.Mesh;
+          mesh.geometry?.dispose();
+          const mat = mesh.material;
+          if (Array.isArray(mat)) {
+            mat.forEach((m) => m.dispose());
+          } else if (mat) {
+            mat.dispose();
+          }
+        }
+      });
       renderer.dispose();
-      mount.removeChild(renderer.domElement);
+      if (renderer.domElement.parentNode === mount) {
+        mount.removeChild(renderer.domElement);
+      }
+      stickerMeshesRef.current = { U: [], R: [], F: [], D: [], L: [], B: [] };
+      arrowMeshesRef.current = [];
     };
   }, []);
 
-  // faces가 바뀌면 스티커 재생성
+  // faces 변경 시 스티커 색만 업데이트 (geometry/mesh 재생성 없음)
   useEffect(() => {
-    const cubeGroup = cubeGroupRef.current;
-    if (!cubeGroup) return;
-
-    // 기존 스티커 제거 (코어는 첫 번째 자식이므로 유지)
-    const toRemove: THREE.Object3D[] = [];
-    cubeGroup.children.forEach((child, i) => {
-      if (i > 0) toRemove.push(child); // 0번은 코어
-    });
-    toRemove.forEach((c) => cubeGroup.remove(c));
-
-    // 면별 9칸 스티커 생성
+    const stickerMeshes = stickerMeshesRef.current;
     FACE_ORDER.forEach((face) => {
       const cells = faces[face];
-      const transform = getFaceTransforms(face);
-      const faceGroup = new THREE.Group();
-      faceGroup.position.set(...transform.position);
-      faceGroup.rotation.set(...transform.rotation);
-
+      const meshes = stickerMeshes[face];
+      if (!meshes || meshes.length !== 9) return;
       for (let i = 0; i < 9; i++) {
         const stickerColor = cells ? cells[i] : null;
-        const hex = stickerColor ? COLOR_HEX[stickerColor] : '#1a1a1a';
-        const stickerGeo = new THREE.PlaneGeometry(STICKER_SIZE, STICKER_SIZE);
-        const stickerMat = new THREE.MeshStandardMaterial({
-          color: new THREE.Color(hex),
-          roughness: 0.35,
-          metalness: 0.05,
-        });
-        const sticker = new THREE.Mesh(stickerGeo, stickerMat);
-        const [x, y] = getStickerLocalPosition(i);
-        sticker.position.set(x, y, 0);
-        faceGroup.add(sticker);
+        const hex = stickerColor ? COLOR_HEX[stickerColor] : EMPTY_STICKER_HEX;
+        meshes[i].material.color.set(hex);
       }
-      cubeGroup.add(faceGroup);
     });
   }, [faces]);
 
@@ -184,23 +209,29 @@ export function CubeViewer3D({ faces, highlightMove }: CubeViewer3DProps) {
     const arrowGroup = arrowGroupRef.current;
     if (!arrowGroup) return;
 
-    // 기존 화살표 제거
-    while (arrowGroup.children.length > 0) {
-      arrowGroup.remove(arrowGroup.children[0]);
-    }
+    // 이전 화살표를 dispose 까지 포함해서 제거
+    const cleanupPrev = () => {
+      cancelAnimationFrame(blinkFrameRef.current);
+      arrowMeshesRef.current.forEach((m) => {
+        arrowGroup.remove(m);
+        m.geometry.dispose();
+        m.material.dispose();
+      });
+      arrowMeshesRef.current = [];
+    };
+    cleanupPrev();
 
-    if (!highlightMove) return;
+    if (!highlightMove) return undefined;
 
     const { faceCode, clockwise } = highlightMove;
     const faceColor = faceCode as CubeColor;
-    if (!FACE_ORDER.includes(faceColor)) return;
+    if (!FACE_ORDER.includes(faceColor)) return undefined;
 
     const transform = getFaceTransforms(faceColor);
 
-    // 토러스 호 (회전 화살표)
     const radius = 1.7;
     const tube = 0.13;
-    const arc = Math.PI * 1.4; // 약 252도 호
+    const arc = Math.PI * 1.4;
     const torusGeo = new THREE.TorusGeometry(radius, tube, 12, 32, arc);
     const torusMat = new THREE.MeshStandardMaterial({
       color: 0xff3b8d,
@@ -208,35 +239,34 @@ export function CubeViewer3D({ faces, highlightMove }: CubeViewer3DProps) {
       emissiveIntensity: 0.45,
       roughness: 0.3,
     });
-    const torus = new THREE.Mesh(torusGeo, torusMat);
+    const torus = new THREE.Mesh(torusGeo, torusMat) as ArrowMesh;
 
-    // 면 바깥쪽으로 배치 (해당 면의 법선 방향으로 약간 띄움)
     const offset = 0.5;
     const facePos = new THREE.Vector3(...transform.position);
     const faceNormal = facePos.clone().normalize();
     torus.position.copy(facePos).add(faceNormal.clone().multiplyScalar(offset));
-
-    // 토러스를 면에 평행하게 (lookAt으로 면 법선 방향에 맞춤)
     torus.lookAt(torus.position.clone().add(faceNormal));
 
-    // 시계/반시계 회전 시각적 차이
     if (!clockwise) {
       torus.rotation.z += Math.PI;
     }
 
     arrowGroup.add(torus);
 
-    // 화살표 머리 (콘) — 호의 끝부분에 배치
     const coneGeo = new THREE.ConeGeometry(tube * 2.5, tube * 5, 12);
-    const cone = new THREE.Mesh(coneGeo, torusMat);
+    const coneMat = new THREE.MeshStandardMaterial({
+      color: 0xff3b8d,
+      emissive: 0xff3b8d,
+      emissiveIntensity: 0.45,
+      roughness: 0.3,
+    });
+    const cone = new THREE.Mesh(coneGeo, coneMat) as ArrowMesh;
 
-    // 화살표 끝 지점 (토러스의 끝 각도)
     const endAngle = clockwise ? arc : -arc;
     const localEnd = new THREE.Vector3(Math.cos(endAngle) * radius, Math.sin(endAngle) * radius, 0);
     localEnd.applyEuler(torus.rotation);
     cone.position.copy(torus.position).add(localEnd);
 
-    // 콘이 진행 방향(접선)을 향하게
     const tangent = new THREE.Vector3(-Math.sin(endAngle), Math.cos(endAngle), 0);
     if (!clockwise) tangent.negate();
     tangent.applyEuler(torus.rotation);
@@ -244,18 +274,25 @@ export function CubeViewer3D({ faces, highlightMove }: CubeViewer3DProps) {
     cone.rotateX(Math.PI / 2);
 
     arrowGroup.add(cone);
+    arrowMeshesRef.current = [torus, cone];
 
-    // 깜빡 효과
+    // 깜빡 효과 (메시가 살아있는 동안만)
     const startTime = performance.now();
+    let alive = true;
     const blink = () => {
+      if (!alive) return;
       const elapsed = (performance.now() - startTime) / 1000;
       const intensity = 0.35 + Math.sin(elapsed * 4) * 0.25;
       torusMat.emissiveIntensity = intensity;
-      if (arrowGroup.children.length > 0) {
-        requestAnimationFrame(blink);
-      }
+      coneMat.emissiveIntensity = intensity;
+      blinkFrameRef.current = requestAnimationFrame(blink);
     };
-    requestAnimationFrame(blink);
+    blinkFrameRef.current = requestAnimationFrame(blink);
+
+    return () => {
+      alive = false;
+      cleanupPrev();
+    };
   }, [highlightMove]);
 
   return <div ref={mountRef} style={{ width: '100%', height: '100%', minHeight: 280 }} />;
