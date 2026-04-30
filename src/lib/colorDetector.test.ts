@@ -31,12 +31,34 @@ describe('colorDetector', () => {
     // Pure Blue
     expect(classifyColor(0, 0, 255)).toBe('B');
 
-    // Orange-ish
+    // Pure Orange
     expect(classifyColor(255, 165, 0)).toBe('L');
   });
 
-  it('should handle slightly shaded white', () => {
-    // Slightly grey/shaded white
-    expect(classifyColor(200, 200, 200)).toBe('U');
+  it('should handle shaded and realistic colors', () => {
+    // Shaded White
+    expect(classifyColor(180, 180, 180)).toBe('U');
+    
+    // Shaded Red (darker)
+    expect(classifyColor(150, 20, 20)).toBe('R');
+    
+    // Shaded Orange
+    expect(classifyColor(200, 100, 20)).toBe('L');
+
+    // Shaded Yellow
+    expect(classifyColor(180, 180, 30)).toBe('D');
+
+    // Shaded Blue
+    expect(classifyColor(30, 30, 150)).toBe('B');
+
+    // Shaded Green
+    expect(classifyColor(30, 150, 30)).toBe('F');
+  });
+
+  it('should distinguish between Red and Orange', () => {
+    // Very reddish orange
+    expect(classifyColor(255, 69, 0)).toBe('L'); // Orange-Red
+    // Very orangey red
+    expect(classifyColor(255, 30, 0)).toBe('R'); 
   });
 });
