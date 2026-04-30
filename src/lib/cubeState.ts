@@ -1,5 +1,5 @@
 import type CubeJs from 'cubejs';
-import type { CubeColor } from './colorDetector';
+import { COLOR_NAME_KR, type CubeColor } from './colorDetector';
 
 // 면 캡처 순서 (사용자 가이드 순서)
 export const FACE_ORDER: CubeColor[] = ['U', 'R', 'F', 'D', 'L', 'B'];
@@ -66,26 +66,30 @@ export function validateCubeState(state: CubeState): ValidationResult {
 
   // 1. 각 색상이 정확히 9개씩인지
   const counts: Record<CubeColor, number> = { U: 0, R: 0, F: 0, D: 0, L: 0, B: 0 };
-  for (const face of FACE_ORDER) {
-    for (const color of state.faces[face]) {
-      counts[color]++;
+  for (const faceKey of FACE_ORDER) {
+    const faceColors = state.faces[faceKey];
+    if (faceColors) {
+      for (const color of faceColors) {
+        counts[color]++;
+      }
     }
   }
-  for (const color of FACE_ORDER) {
-    if (counts[color] !== 9) {
+  for (const colorKey of FACE_ORDER) {
+    if (counts[colorKey] !== 9) {
       return {
         valid: false,
-        error: `${color}색 칸이 ${counts[color]}개로 잘못 인식됐어요 (9개 필요)`,
+        error: `${COLOR_NAME_KR[colorKey]} 칸이 ${counts[colorKey]}개로 잘못 인식됐어요 (9개 필요)`,
       };
     }
   }
 
   // 2. 각 면 중심이 그 면의 색이어야 함
-  for (const face of FACE_ORDER) {
-    if (state.faces[face][4] !== face) {
+  for (const faceKey of FACE_ORDER) {
+    const faceColors = state.faces[faceKey];
+    if (faceColors && faceColors[4] !== faceKey) {
       return {
         valid: false,
-        error: `${face}면 중앙이 ${state.faces[face][4]}로 잘못 인식됐어요`,
+        error: `${FACE_NAME_KR[faceKey]} 중앙이 ${COLOR_NAME_KR[faceColors[4] as CubeColor]}로 잘못 인식됐어요`,
       };
     }
   }
@@ -100,14 +104,21 @@ type CubeCtor = typeof CubeJs;
 let CubeLib: CubeCtor | null = null;
 let solverInitialized = false;
 let initPromise: Promise<void> | null = null;
+let loadPromise: Promise<CubeCtor> | null = null;
 
 async function loadCubeLib(): Promise<CubeCtor> {
   if (CubeLib) return CubeLib;
-  const mod = await import('cubejs');
-  // ESM/CJS 호환
-  const ctor = (mod as unknown as { default?: CubeCtor }).default ?? (mod as unknown as CubeCtor);
-  CubeLib = ctor;
-  return ctor;
+  if (loadPromise) return loadPromise;
+
+  loadPromise = (async () => {
+    const mod = await import('cubejs');
+    // ESM/CJS 호환
+    const ctor = (mod as unknown as { default?: CubeCtor }).default ?? (mod as unknown as CubeCtor);
+    CubeLib = ctor;
+    return ctor;
+  })();
+
+  return loadPromise;
 }
 
 /**
