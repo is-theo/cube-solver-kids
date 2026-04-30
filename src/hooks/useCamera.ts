@@ -72,8 +72,17 @@ export function useCamera(): UseCameraResult {
     const track = streamRef.current.getVideoTracks()[0];
     if (!track) return;
 
-    const capabilities = (track as any).getCapabilities?.() || {};
-    const constraints: any = {};
+    interface ExtendedCapabilities extends MediaTrackCapabilities {
+      exposureMode?: string[];
+      whiteBalanceMode?: string[];
+    }
+    interface ExtendedConstraints extends MediaTrackConstraintSet {
+      exposureMode?: string;
+      whiteBalanceMode?: string;
+    }
+
+    const capabilities = (track.getCapabilities?.() || {}) as ExtendedCapabilities;
+    const constraints: ExtendedConstraints = {};
 
     if (capabilities.exposureMode?.includes(locked ? 'manual' : 'continuous')) {
       constraints.exposureMode = locked ? 'manual' : 'continuous';
@@ -84,7 +93,7 @@ export function useCamera(): UseCameraResult {
 
     if (Object.keys(constraints).length > 0) {
       try {
-        await track.applyConstraints({ advanced: [constraints] } as any);
+        await track.applyConstraints({ advanced: [constraints] });
       } catch (e) {
         console.warn('Failed to apply camera constraints', e);
       }

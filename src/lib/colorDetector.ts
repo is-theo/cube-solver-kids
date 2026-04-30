@@ -1,3 +1,5 @@
+import { Lab, rgbToLab, deltaE76 } from './colorSpace';
+
 // 큐브 색상 6가지 (cubejs 표준 표기)
 export type CubeColor = 'U' | 'R' | 'F' | 'D' | 'L' | 'B';
 // U=White(위), R=Red(오), F=Green(앞), D=Yellow(아래), L=Orange(왼), B=Blue(뒤)
@@ -20,11 +22,8 @@ export const COLOR_NAME_KR: Record<CubeColor, string> = {
   B: '파랑',
 };
 
-export interface Lab {
-  l: number;
-  a: number;
-  b: number;
-}
+export type { Lab };
+export { rgbToLab };
 
 export interface CalibrationData {
   references: Record<CubeColor, Lab>;
@@ -47,71 +46,20 @@ export function loadCalibration(): CalibrationData | null {
 }
 
 /**
- * RGB to XYZ conversion
- */
-function rgbToXyz(r: number, g: number, b: number): { x: number; y: number; z: number } {
-  r /= 255;
-  g /= 255;
-  b /= 255;
-
-  r = r > 0.04045 ? Math.pow((r + 0.055) / 1.055, 2.4) : r / 12.92;
-  g = g > 0.04045 ? Math.pow((g + 0.055) / 1.055, 2.4) : g / 12.92;
-  b = b > 0.04045 ? Math.pow((b + 0.055) / 1.055, 2.4) : b / 12.92;
-
-  r *= 100;
-  g *= 100;
-  b *= 100;
-
-  // D65 illuminant
-  const x = r * 0.4124 + g * 0.3576 + b * 0.1805;
-  const y = r * 0.2126 + g * 0.7152 + b * 0.0722;
-  const z = r * 0.0193 + g * 0.1192 + b * 0.9505;
-
-  return { x, y, z };
-}
-
-/**
- * XYZ to Lab conversion
- */
-export function xyzToLab(x: number, y: number, z: number): Lab {
-  // D65
-  x /= 95.047;
-  y /= 100.0;
-  z /= 108.883;
-
-  x = x > 0.008856 ? Math.pow(x, 1 / 3) : 7.787 * x + 16 / 116;
-  y = y > 0.008856 ? Math.pow(y, 1 / 3) : 7.787 * y + 16 / 116;
-  z = z > 0.008856 ? Math.pow(z, 1 / 3) : 7.787 * z + 16 / 116;
-
-  return {
-    l: 116 * y - 16,
-    a: 500 * (x - y),
-    b: 200 * (y - z),
-  };
-}
-
-export function rgbToLab(r: number, g: number, b: number): Lab {
-  const { x, y, z } = rgbToXyz(r, g, b);
-  return xyzToLab(x, y, z);
-}
-
-/**
- * Delta E (CIE76) - 간단한 유클리드 거리
+ * Delta E (CIE76) - colorSpace.ts의 deltaE76 재사용
  */
 export function deltaE(lab1: Lab, lab2: Lab): number {
-  return Math.sqrt(
-    Math.pow(lab1.l - lab2.l, 2) + Math.pow(lab1.a - lab2.a, 2) + Math.pow(lab1.b - lab2.b, 2)
-  );
+  return deltaE76(lab1, lab2);
 }
 
 // 기본 참조값 (D65 기준 대략적인 Lab 값들)
 const DEFAULT_REFERENCES: Record<CubeColor, Lab> = {
-  U: { l: 95, a: 0, b: 0 },    // White
-  R: { l: 45, a: 65, b: 45 },  // Red
-  F: { l: 75, a: -65, b: 45 }, // Green
-  D: { l: 85, a: 0, b: 85 },   // Yellow
-  L: { l: 65, a: 45, b: 75 },  // Orange
-  B: { l: 40, a: 0, b: -50 },  // Blue
+  U: { L: 95, a: 0, b: 0 },    // White
+  R: { L: 45, a: 65, b: 45 },  // Red
+  F: { L: 75, a: -65, b: 45 }, // Green
+  D: { L: 85, a: 0, b: 85 },   // Yellow
+  L: { L: 65, a: 45, b: 75 },  // Orange
+  B: { L: 40, a: 0, b: -50 },  // Blue
 };
 
 /**

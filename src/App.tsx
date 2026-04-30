@@ -6,7 +6,6 @@ import {
   FACE_ORDER,
   FACE_INSTRUCTION_KR,
   createEmptyCubeState,
-  isComplete,
   initSolver,
   toFaceletString,
   validateCubeState,

@@ -31,7 +31,7 @@ export function CameraCapture({ targetFace, instructionText, onCaptured, onSkip 
   const [countdown, setCountdown] = useState<number | null>(null);
   const [captured, setCaptured] = useState(false);
   const [debug, setDebug] = useState(false);
-  const [calibration, setCalibration] = useState<CalibrationData | null>(loadCalibration());
+  const [calibration, setCalibration] = useState<CalibrationData | null>(() => loadCalibration());
   const [isCalibrating, setIsCalibrating] = useState(false);
   const [calibStep, setCalibStep] = useState<CubeColor | null>(null);
 
@@ -333,7 +333,7 @@ export function CameraCapture({ targetFace, instructionText, onCaptured, onSkip 
           <div className="debug-panel">
             {livePreview.map((c, i) => (
               <div key={i}>
-                #{i}: L{Math.round(c.lab.l)} a{Math.round(c.lab.a)} b{Math.round(c.lab.b)}
+                #{i}: L{Math.round(c.lab.L)} a{Math.round(c.lab.a)} b{Math.round(c.lab.b)}
               </div>
             ))}
             <div>Stable: {stable ? 'Y' : 'N'} ({stableFramesRef.current})</div>
