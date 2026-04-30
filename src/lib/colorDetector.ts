@@ -53,11 +53,17 @@ export function rgbToHsv(r: number, g: number, b: number): HSV {
  */
 export function classifyColor(r: number, g: number, b: number): CubeColor {
   const { h, s, v } = rgbToHsv(r, g, b);
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const diff = max - min;
 
-  // 1. 흰색: 채도 낮고 밝음 (조명에 따라 임계값을 약간 낮춰 그늘진 흰색 인식)
-  if (s < 0.22 && v > 0.5) return 'U';
+  // 1. 흰색(U): 채도가 매우 낮고 색상간 차이가 적으면 흰색으로 간주.
+  // s < 0.20 && v > 0.4: 밝은 곳에서의 흰색/밝은 회색
+  // diff < 40: RGB 값들이 서로 비슷함 (무채색 계열)
+  if (s < 0.20 && v > 0.4 && diff < 45) return 'U';
+  if (s < 0.10 && diff < 25) return 'U'; // 극단적으로 채도가 낮은 경우 (회색조)
 
-  // 2. 색상별 Hue 범위 (어두운 픽셀도 Hue 기반 분류 — 그늘 속 빨강을 파랑으로 오인식하던 폴백 제거)
+  // 2. 색상별 Hue 범위 (어두운 픽셀도 Hue 기반 분류)
   // 빨강: 345-360 또는 0-10
   if (h >= 345 || h < 10) return 'R';
   // 주황: 10-40
