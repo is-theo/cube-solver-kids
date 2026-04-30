@@ -84,11 +84,11 @@ export function CameraCapture({ targetFace, instructionText, onCaptured, onSkip 
   const handleCalibrationCapture = () => {
     if (!livePreview || !calibStep) return;
     const centerLab = livePreview[4].lab;
-    const nextRefs: Record<CubeColor, Lab> = { 
+    const nextRefs: Partial<Record<CubeColor, Lab>> = { 
       ...(calibration?.references || {}), 
       [calibStep]: centerLab 
-    } as Record<CubeColor, Lab>;
-    const nextCalib: CalibrationData = { references: nextRefs };
+    };
+    const nextCalib: CalibrationData = { references: nextRefs as Record<CubeColor, Lab> };
     setCalibration(nextCalib);
 
     // 다음 색상 순서: U -> R -> F -> D -> L -> B
@@ -251,12 +251,20 @@ export function CameraCapture({ targetFace, instructionText, onCaptured, onSkip 
     return () => clearTimeout(t);
   }, [countdown, captured, livePreview, onCaptured]);
 
-  const handleCornerMove = (idx: number, e: React.TouchEvent | React.MouseEvent) => {
+  const handleCornerMove = (idx: number, e: React.TouchEvent | React.MouseEvent | MouseEvent) => {
     const video = videoRef.current;
     if (!video) return;
     const rect = video.getBoundingClientRect();
-    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    let clientX: number;
+    let clientY: number;
+
+    if ('touches' in e) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    }
 
     const x = ((clientX - rect.left) / rect.width) * video.videoWidth;
     const y = ((clientY - rect.top) / rect.height) * video.videoHeight;
@@ -308,8 +316,8 @@ export function CameraCapture({ targetFace, instructionText, onCaptured, onSkip 
               left: `${(p.x / videoSizeRef.current.w) * 100}%`,
               top: `${(p.y / videoSizeRef.current.h) * 100}%`,
             }}
-            onMouseDown={(e) => {
-              const move = (me: MouseEvent) => handleCornerMove(i, me as any);
+            onMouseDown={() => {
+              const move = (me: MouseEvent) => handleCornerMove(i, me);
               const up = () => {
                 window.removeEventListener('mousemove', move);
                 window.removeEventListener('mouseup', up);

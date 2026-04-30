@@ -59,7 +59,7 @@ describe('colorDetector', () => {
       const partialCalibration: CalibrationData = {
         references: {
           R: { l: 10, a: 0, b: 0 }, // Fake Red (Dark)
-        } as any
+        } as Record<CubeColor, Lab>
       };
       
       // Red should use custom

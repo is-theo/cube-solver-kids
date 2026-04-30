@@ -62,7 +62,9 @@ export interface ValidationResult {
 export function getKoreanParticle(name: string): string {
   const lastChar = name.charCodeAt(name.length - 1);
   if (lastChar < 0xac00 || lastChar > 0xd7a3) return '로';
-  return (lastChar - 0xac00) % 28 > 0 ? '으로' : '로';
+  const batchimIndex = (lastChar - 0xac00) % 28;
+  // batchimIndex 0 is no batchim, 8 is 'ㄹ'. Both take '로'.
+  return batchimIndex > 0 && batchimIndex !== 8 ? '으로' : '로';
 }
 
 export function validateCubeState(state: CubeState): ValidationResult {
