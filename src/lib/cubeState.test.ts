@@ -57,7 +57,7 @@ describe('cubeState', () => {
     
     const result = validateCubeState(state);
     expect(result.valid).toBe(false);
-    expect(result.error).toContain('흰색으로 잘못 인식된 칸이 8개 있어요');
+    expect(result.error).toContain('흰색 칸이 8개 인식됐어요');
   });
 
   it('should fail validation if centers are wrong', () => {
@@ -79,7 +79,7 @@ describe('cubeState', () => {
     
     const result = validateCubeState(state);
     expect(result.valid).toBe(false);
-    expect(result.error).toContain('윗면 (흰색 중심) 중앙이 빨강으로 잘못 인식됐어요');
+    expect(result.error).toContain('윗면 (흰색 중심) 중앙이 빨강으로 잘못 인식됐어요. 올바른 면을 보여주세요!');
   });
 
   it('should fail validation if state is incomplete', () => {

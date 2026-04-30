@@ -72,7 +72,18 @@ export function validateCubeState(state: CubeState): ValidationResult {
     return { valid: false, error: '아직 모든 면을 다 보여주지 않았어요' };
   }
 
-  // 1. 각 색상이 정확히 9개씩인지
+  const errors: string[] = [];
+
+  // 1. 각 면 중심이 그 면의 색이어야 함 (중심이 틀리면 나머지도 틀릴 확률이 높으므로 먼저 체크)
+  for (const faceKey of FACE_ORDER) {
+    const faceColors = state.faces[faceKey];
+    if (faceColors && faceColors[4] !== faceKey) {
+      const detectedName = COLOR_NAME_KR[faceColors[4] as CubeColor];
+      errors.push(`${FACE_NAME_KR[faceKey]} 중앙이 ${detectedName}${getKoreanParticle(detectedName)} 잘못 인식됐어요. 올바른 면을 보여주세요!`);
+    }
+  }
+
+  // 2. 각 색상이 정확히 9개씩인지
   const counts: Record<CubeColor, number> = { U: 0, R: 0, F: 0, D: 0, L: 0, B: 0 };
   for (const faceKey of FACE_ORDER) {
     const faceColors = state.faces[faceKey];
@@ -85,23 +96,14 @@ export function validateCubeState(state: CubeState): ValidationResult {
   for (const colorKey of FACE_ORDER) {
     if (counts[colorKey] !== 9) {
       const colorName = COLOR_NAME_KR[colorKey];
-      return {
-        valid: false,
-        error: `${colorName}${getKoreanParticle(colorName)} 잘못 인식된 칸이 ${counts[colorKey]}개 있어요 (9개 필요)`,
-      };
+      // '흰색' 등은 이미 '색'으로 끝나므로 중복 방지
+      const displayName = colorName.endsWith('색') ? colorName : `${colorName}색`;
+      errors.push(`${displayName} 칸이 ${counts[colorKey]}개 인식됐어요 (9개가 필요해요)`);
     }
   }
 
-  // 2. 각 면 중심이 그 면의 색이어야 함
-  for (const faceKey of FACE_ORDER) {
-    const faceColors = state.faces[faceKey];
-    if (faceColors && faceColors[4] !== faceKey) {
-      const detectedName = COLOR_NAME_KR[faceColors[4] as CubeColor];
-      return {
-        valid: false,
-        error: `${FACE_NAME_KR[faceKey]} 중앙이 ${detectedName}${getKoreanParticle(detectedName)} 잘못 인식됐어요`,
-      };
-    }
+  if (errors.length > 0) {
+    return { valid: false, error: errors[0] }; // 가장 중요한 첫 번째 에러 반환
   }
 
   return { valid: true };
