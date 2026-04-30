@@ -10,6 +10,7 @@ import {
   toFaceletString,
   validateCubeState,
   solveCube,
+  initSolver,
   type CubeState,
 } from './lib/cubeState';
 import type { CubeColor } from './lib/colorDetector';
@@ -126,7 +127,10 @@ export default function App() {
             </ol>
             <button
               className="btn-primary btn-large"
-              onClick={() => setPhase('capturing')}
+              onClick={() => {
+                setPhase('capturing');
+                initSolver(); // 솔버 예열 시작
+              }}
             >
               시작하기 🚀
             </button>

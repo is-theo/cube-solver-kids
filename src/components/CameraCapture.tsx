@@ -31,7 +31,7 @@ export function CameraCapture({ targetFace, instructionText, onCaptured, onSkip 
   const [countdown, setCountdown] = useState<number | null>(null);
   const [captured, setCaptured] = useState(false);
   const [debug, setDebug] = useState(false);
-  const [calibration, setCalibration] = useState<CalibrationData | null>(loadCalibration());
+  const [calibration, setCalibration] = useState<CalibrationData | null>(() => loadCalibration());
   const [isCalibrating, setIsCalibrating] = useState(false);
   const [calibStep, setCalibStep] = useState<CubeColor | null>(null);
 

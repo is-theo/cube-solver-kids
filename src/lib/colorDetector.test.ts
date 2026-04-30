@@ -1,7 +1,11 @@
-import { describe, it, expect } from 'vitest';
-import { classifyColor, rgbToLab, deltaE, type CalibrationData, type CubeColor, type Lab } from './colorDetector';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { classifyColor, rgbToLab, deltaE, saveCalibration, loadCalibration, type CalibrationData, type CubeColor, type Lab } from './colorDetector';
 
 describe('colorDetector', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
   describe('rgbToLab', () => {
     it('should convert pure colors correctly to Lab', () => {
       // White
