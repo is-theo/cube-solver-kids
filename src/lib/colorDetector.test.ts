@@ -63,8 +63,11 @@ describe('colorDetector', () => {
     });
 
     it('should handle lighting variations (shadows and highlights)', () => {
-      // Shadowed white should still be white
-      expect(classifyColor(120, 120, 120)).toBe('U');
+      // Very dark grey (120, 120, 120) is close to White but should have lower confidence
+      const result = classifyColorWithConfidence(120, 120, 120);
+      expect(result.color).toBe('U');
+      expect(result.confidence).toBeLessThan(0.7);
+
       // Bright yellow vs Pale yellow
       expect(classifyColor(255, 255, 0)).toBe('D');
       expect(classifyColor(200, 200, 100)).toBe('D');
@@ -161,6 +164,18 @@ describe('colorDetector', () => {
       
       mockSetItem.mockRestore();
       consoleSpy.mockRestore();
+    });
+
+    it('should handle SSR (no window)', () => {
+      const originalWindow = global.window;
+      // @ts-ignore
+      delete global.window;
+
+      expect(loadCalibration()).toBeNull();
+      // Should not throw
+      saveCalibration({ references: {} });
+
+      global.window = originalWindow;
     });
 
     it('should handle corrupted calibration data', () => {

@@ -32,6 +32,7 @@ export interface CalibrationData {
 const STORAGE_KEY = 'rubiks_calibration';
 
 export function saveCalibration(data: CalibrationData) {
+  if (typeof window === 'undefined') return;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   } catch (e) {
@@ -60,7 +61,8 @@ export function deltaE(lab1: Lab, lab2: Lab): number {
 }
 
 // 기본 참조값 (D65 기준 큐브 스티커의 일반적인 Lab 값)
-// sRGB 순수값보다 실제 무광/유광 스티커의 반사율을 고려하여 조정됨
+// sRGB 순수값보다 실제 무광/유광 스티커의 반사율과 측정된 평균치를 고려하여 조정됨.
+// 사용자의 조명 환경에 따라 캘리브레이션을 통해 보정하는 것이 가장 정확합니다.
 const DEFAULT_REFERENCES: Record<CubeColor, Lab> = {
   U: { L: 95, a: 0, b: 0 },      // White (흰색)
   R: { L: 53, a: 80, b: 67 },    // Red (빨간색)
