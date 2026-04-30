@@ -1,7 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { useCamera } from '../hooks/useCamera';
-import { extract9CellsWithRgb, COLOR_HEX, COLOR_NAME_KR } from '../lib/colorDetector';
-import type { CubeColor } from '../lib/colorDetector';
+import {
+  extract9Cells,
+  COLOR_HEX,
+  COLOR_NAME_KR,
+  loadCalibration,
+  saveCalibration,
+} from '../lib/colorDetector';
+import type { CubeColor, Point, CalibrationData, Lab } from '../lib/colorDetector';
 
 interface CameraCaptureProps {
   targetFace: CubeColor;
@@ -10,15 +16,13 @@ interface CameraCaptureProps {
   onSkip?: () => void;
 }
 
-const GRID_SIZE_RATIO = 0.55; // 화면 짧은 변 대비 그리드 크기
+const LIVE_PREVIEW_THROTTLE_MS = 100;
+const STABLE_FRAMES_TO_TRIGGER = 12;
 
-type LivePreviewCell = { color: CubeColor; rgb: [number, number, number] };
-
-const LIVE_PREVIEW_THROTTLE_MS = 180;
-const STABLE_FRAMES_TO_TRIGGER = 8;
+type LivePreviewCell = { color: CubeColor; rgb: [number, number, number]; lab: Lab };
 
 export function CameraCapture({ targetFace, instructionText, onCaptured, onSkip }: CameraCaptureProps) {
-  const { videoRef, ready, error, retry } = useCamera();
+  const { videoRef, ready, error, retry, lockCamera, unlockCamera } = useCamera();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -26,26 +30,82 @@ export function CameraCapture({ targetFace, instructionText, onCaptured, onSkip 
   const [stable, setStable] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [captured, setCaptured] = useState(false);
+  const [debug, setDebug] = useState(false);
+  const [calibration, setCalibration] = useState<CalibrationData | null>(loadCalibration());
+  const [isCalibrating, setIsCalibrating] = useState(false);
+  const [calibStep, setCalibStep] = useState<CubeColor | null>(null);
 
-  // 매 프레임 변경되는 값은 ref 로 관리해 리렌더링을 피한다
+  // 4코너 좌표 (비디오 좌표계 기준)
+  const [corners, setCorners] = useState<[Point, Point, Point, Point]>([
+    { x: 100, y: 100 },
+    { x: 300, y: 100 },
+    { x: 300, y: 300 },
+    { x: 100, y: 300 },
+  ]);
+
   const stableFramesRef = useRef(0);
   const lastColorsRef = useRef<string>('');
   const lastPreviewPushRef = useRef<number>(0);
   const rafRef = useRef<number>(0);
+  const calibRafRef = useRef<number>(0);
+  const videoSizeRef = useRef({ w: 0, h: 0 });
 
-  // targetFace 가 바뀌면 누적 상태 초기화
+  // 초기 그리드 설정 (비디오 로드 후 한 번)
+  useEffect(() => {
+    if (ready && videoRef.current && videoSizeRef.current.w === 0) {
+      const vw = videoRef.current.videoWidth;
+      const vh = videoRef.current.videoHeight;
+      videoSizeRef.current = { w: vw, h: vh };
+      const size = Math.min(vw, vh) * 0.55;
+      const ox = (vw - size) / 2;
+      const oy = (vh - size) / 2;
+      setCorners([
+        { x: ox, y: oy },
+        { x: ox + size, y: oy },
+        { x: ox + size, y: oy + size },
+        { x: ox, y: oy + size },
+      ]);
+    }
+  }, [ready]);
+
   useEffect(() => {
     stableFramesRef.current = 0;
     lastColorsRef.current = '';
-    lastPreviewPushRef.current = 0;
     setStable(false);
     setLivePreview(null);
     setCountdown(null);
   }, [targetFace]);
 
+  const startCalibration = () => {
+    setIsCalibrating(true);
+    setCalibStep('U'); // 흰색부터 시작
+  };
+
+  const handleCalibrationCapture = () => {
+    if (!livePreview || !calibStep) return;
+    const centerLab = livePreview[4].lab;
+    const nextRefs: Partial<Record<CubeColor, Lab>> = { 
+      ...(calibration?.references || {}), 
+      [calibStep]: centerLab 
+    };
+    const nextCalib: CalibrationData = { references: nextRefs as Record<CubeColor, Lab> };
+    setCalibration(nextCalib);
+
+    // 다음 색상 순서: U -> R -> F -> D -> L -> B
+    const order: CubeColor[] = ['U', 'R', 'F', 'D', 'L', 'B'];
+    const idx = order.indexOf(calibStep);
+    if (idx < order.length - 1) {
+      setCalibStep(order[idx + 1]);
+    } else {
+      saveCalibration(nextCalib);
+      setIsCalibrating(false);
+      setCalibStep(null);
+    }
+  };
+
   // 메인 분석 루프
   useEffect(() => {
-    if (!ready || captured) return;
+    if (!ready || captured || isCalibrating) return;
     let stopped = false;
 
     const tick = () => {
@@ -76,14 +136,9 @@ export function CameraCapture({ targetFace, instructionText, onCaptured, onSkip 
 
       ctx.drawImage(video, 0, 0, vw, vh);
 
-      const minDim = Math.min(vw, vh);
-      const gridSize = minDim * GRID_SIZE_RATIO;
-      const gx = (vw - gridSize) / 2;
-      const gy = (vh - gridSize) / 2;
+      const cells = extract9Cells(ctx, corners, calibration || undefined);
 
-      const cells = extract9CellsWithRgb(ctx, gx, gy, gridSize);
-
-      // 안정성 체크 (ref 사용 → 매 프레임 setState 폭주 제거)
+      // 안정성 체크
       const colorsKey = cells.map((c) => c.color).join('');
       if (colorsKey === lastColorsRef.current) {
         stableFramesRef.current += 1;
@@ -94,7 +149,6 @@ export function CameraCapture({ targetFace, instructionText, onCaptured, onSkip 
       const isStable = stableFramesRef.current >= STABLE_FRAMES_TO_TRIGGER;
       setStable((prev) => (prev !== isStable ? isStable : prev));
 
-      // livePreview 는 ~180ms 주기로만 업데이트
       const now = performance.now();
       if (now - lastPreviewPushRef.current >= LIVE_PREVIEW_THROTTLE_MS) {
         lastPreviewPushRef.current = now;
@@ -103,20 +157,31 @@ export function CameraCapture({ targetFace, instructionText, onCaptured, onSkip 
 
       // 오버레이 그리기
       octx.clearRect(0, 0, vw, vh);
-      octx.strokeStyle = 'rgba(255, 255, 255, 0.95)';
-      octx.lineWidth = 4;
-      octx.strokeRect(gx, gy, gridSize, gridSize);
-      const cellSize = gridSize / 3;
-      octx.lineWidth = 2;
-      octx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+      octx.strokeStyle = isStable ? 'rgba(0, 255, 0, 0.8)' : 'rgba(255, 255, 255, 0.9)';
+      octx.lineWidth = 3;
+
+      // 외곽선
+      octx.beginPath();
+      octx.moveTo(corners[0].x, corners[0].y);
+      octx.lineTo(corners[1].x, corners[1].y);
+      octx.lineTo(corners[2].x, corners[2].y);
+      octx.lineTo(corners[3].x, corners[3].y);
+      octx.closePath();
+      octx.stroke();
+
+      // 내부 격자
+      octx.lineWidth = 1.5;
       for (let i = 1; i < 3; i++) {
+        const t = i / 3;
+        // 세로선
         octx.beginPath();
-        octx.moveTo(gx + i * cellSize, gy);
-        octx.lineTo(gx + i * cellSize, gy + gridSize);
+        octx.moveTo((1 - t) * corners[0].x + t * corners[1].x, (1 - t) * corners[0].y + t * corners[1].y);
+        octx.lineTo((1 - t) * corners[3].x + t * corners[2].x, (1 - t) * corners[3].y + t * corners[2].y);
         octx.stroke();
+        // 가로선
         octx.beginPath();
-        octx.moveTo(gx, gy + i * cellSize);
-        octx.lineTo(gx + gridSize, gy + i * cellSize);
+        octx.moveTo((1 - t) * corners[0].x + t * corners[3].x, (1 - t) * corners[0].y + t * corners[3].y);
+        octx.lineTo((1 - t) * corners[1].x + t * corners[2].x, (1 - t) * corners[1].y + t * corners[2].y);
         octx.stroke();
       }
 
@@ -128,31 +193,57 @@ export function CameraCapture({ targetFace, instructionText, onCaptured, onSkip 
       stopped = true;
       cancelAnimationFrame(rafRef.current);
     };
-  }, [ready, captured, videoRef]);
+  }, [ready, captured, corners, calibration, isCalibrating]);
 
-  // 안정화 → 카운트다운 → 캡처
+  // Calibration loop (dedicated)
   useEffect(() => {
-    if (captured || !livePreview) return;
+    if (!ready || !isCalibrating) return;
+    let stopped = false;
+    const tick = () => {
+      if (stopped) return;
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      if (!video || !canvas || video.videoWidth === 0) {
+        calibRafRef.current = requestAnimationFrame(tick);
+        return;
+      }
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      if (ctx) {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const cells = extract9Cells(ctx, corners, undefined);
+        setLivePreview(cells);
+      }
+      calibRafRef.current = requestAnimationFrame(tick);
+    };
+    calibRafRef.current = requestAnimationFrame(tick);
+    return () => {
+      stopped = true;
+      cancelAnimationFrame(calibRafRef.current);
+    };
+  }, [ready, isCalibrating, corners]);
 
+  useEffect(() => {
+    if (captured || !livePreview || isCalibrating) return;
     const centerOk = livePreview[4].color === targetFace;
-
     if (stable && centerOk && countdown === null) {
       setCountdown(3);
+      lockCamera();
     } else if (!stable && countdown !== null) {
       setCountdown(null);
+      unlockCamera();
     }
-  }, [stable, livePreview, targetFace, captured, countdown]);
+  }, [stable, livePreview, targetFace, captured, countdown, isCalibrating]);
 
-  // 카운트다운 진행
   useEffect(() => {
     if (countdown === null || captured) return;
     if (countdown <= 0) {
-      // 캡처!
       if (livePreview) {
         setCaptured(true);
         const colors = livePreview.map((c) => c.color);
-        // 짧은 딜레이 후 콜백 (UX)
-        setTimeout(() => onCaptured(colors), 350);
+        setTimeout(() => {
+          onCaptured(colors);
+          unlockCamera();
+        }, 350);
       }
       return;
     }
@@ -160,13 +251,34 @@ export function CameraCapture({ targetFace, instructionText, onCaptured, onSkip 
     return () => clearTimeout(t);
   }, [countdown, captured, livePreview, onCaptured]);
 
+  const handleCornerMove = (idx: number, e: React.TouchEvent | React.MouseEvent | MouseEvent) => {
+    const video = videoRef.current;
+    if (!video) return;
+    const rect = video.getBoundingClientRect();
+    let clientX: number;
+    let clientY: number;
+
+    if ('touches' in e) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    }
+
+    const x = ((clientX - rect.left) / rect.width) * video.videoWidth;
+    const y = ((clientY - rect.top) / rect.height) * video.videoHeight;
+
+    const next = [...corners] as [Point, Point, Point, Point];
+    next[idx] = { x, y };
+    setCorners(next);
+  };
+
   if (error) {
     return (
       <div className="camera-error">
         <p>{error}</p>
-        <button className="btn-primary" onClick={retry}>
-          다시 시도
-        </button>
+        <button className="btn-primary" onClick={retry}>다시 시도</button>
       </div>
     );
   }
@@ -180,17 +292,13 @@ export function CameraCapture({ targetFace, instructionText, onCaptured, onSkip 
           <span className="step-badge" style={{ background: COLOR_HEX[targetFace] }} />
           <span>{instructionText}</span>
         </div>
-        {ready && (
+        {ready && !isCalibrating && (
           <div className="status-line">
             {!centerOk && livePreview && (
-              <span className="status-warn">
-                중앙이 <b>{COLOR_NAME_KR[targetFace]}</b>이어야 해요!
-              </span>
+              <span className="status-warn">중앙이 <b>{COLOR_NAME_KR[targetFace]}</b>이어야 해요!</span>
             )}
             {centerOk && !stable && <span className="status-tip">큐브를 가만히 들어줘 ✋</span>}
-            {centerOk && stable && countdown !== null && countdown > 0 && (
-              <span className="status-go">곧 찰칵! 📸</span>
-            )}
+            {centerOk && stable && countdown !== null && countdown > 0 && <span className="status-go">곧 찰칵! 📸</span>}
           </div>
         )}
       </div>
@@ -200,36 +308,75 @@ export function CameraCapture({ targetFace, instructionText, onCaptured, onSkip 
         <canvas ref={canvasRef} style={{ display: 'none' }} />
         <canvas ref={overlayCanvasRef} className="overlay-canvas" />
 
-        {!ready && <div className="loading">카메라 켜는 중... 📷</div>}
+        {!isCalibrating && videoSizeRef.current.w > 0 && corners.map((p, i) => (
+          <div
+            key={i}
+            className="corner-handle"
+            style={{
+              left: `${(p.x / videoSizeRef.current.w) * 100}%`,
+              top: `${(p.y / videoSizeRef.current.h) * 100}%`,
+            }}
+            onMouseDown={() => {
+              const move = (me: MouseEvent) => handleCornerMove(i, me);
+              const up = () => {
+                window.removeEventListener('mousemove', move);
+                window.removeEventListener('mouseup', up);
+              };
+              window.addEventListener('mousemove', move);
+              window.addEventListener('mouseup', up);
+            }}
+            onTouchMove={(e) => handleCornerMove(i, e)}
+          />
+        ))}
 
-        {countdown !== null && countdown > 0 && (
-          <div className="countdown">{countdown}</div>
+        {debug && livePreview && (
+          <div className="debug-panel">
+            {livePreview.map((c, i) => (
+              <div key={i}>
+                #{i}: L{Math.round(c.lab.l)} a{Math.round(c.lab.a)} b{Math.round(c.lab.b)}
+              </div>
+            ))}
+            <div>Stable: {stable ? 'Y' : 'N'} ({stableFramesRef.current})</div>
+          </div>
         )}
 
+        {isCalibrating && calibStep && (
+          <div className="calibration-overlay">
+            <h3>색상 캘리브레이션</h3>
+            <p>화면 중앙에 <b>{COLOR_NAME_KR[calibStep]}</b> 조각을 맞춰주세요.</p>
+            <div className="calibration-target" style={{ borderColor: COLOR_HEX[calibStep] }}>
+              {livePreview && (
+                <div style={{ width: '80%', height: '80%', background: `rgb(${livePreview[4].rgb.join(',')})` }} />
+              )}
+            </div>
+            <button className="btn-primary" onClick={handleCalibrationCapture}>
+              이 색상 저장
+            </button>
+          </div>
+        )}
+
+        {!ready && <div className="loading">카메라 켜는 중... 📷</div>}
+        {countdown !== null && countdown > 0 && <div className="countdown">{countdown}</div>}
         {captured && <div className="flash" />}
       </div>
 
-      {livePreview && (
+      <div className="camera-controls">
+        <button className="btn-tiny" onClick={() => setDebug(!debug)}>디버그 {debug ? '끄기' : '켜기'}</button>
+        <button className="btn-tiny" onClick={startCalibration} disabled={isCalibrating}>캘리브레이션</button>
+      </div>
+
+      {livePreview && !isCalibrating && (
         <div className="live-preview">
-          <div className="preview-label">지금 보이는 색깔:</div>
+          <div className="preview-label">인식 중:</div>
           <div className="preview-grid">
             {livePreview.map((cell, i) => (
-              <div
-                key={i}
-                className="preview-cell"
-                style={{ background: COLOR_HEX[cell.color] }}
-                title={`RGB: ${cell.rgb.join(',')}`}
-              />
+              <div key={i} className="preview-cell" style={{ background: COLOR_HEX[cell.color] }} />
             ))}
           </div>
         </div>
       )}
 
-      {onSkip && (
-        <button className="btn-ghost" onClick={onSkip}>
-          이 면 건너뛰기 (수동 입력)
-        </button>
-      )}
+      {onSkip && <button className="btn-ghost" onClick={onSkip}>이 면 건너뛰기 (수동 입력)</button>}
     </div>
   );
 }

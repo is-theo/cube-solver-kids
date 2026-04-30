@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createEmptyCubeState, isComplete, toFaceletString, validateCubeState } from './cubeState';
+import { createEmptyCubeState, isComplete, toFaceletString, validateCubeState, type CompletedCubeState } from './cubeState';
 import type { CubeColor } from './colorDetector';
 
 describe('cubeState', () => {
@@ -22,6 +22,8 @@ describe('cubeState', () => {
     expect(isComplete(state)).toBe(true);
     if (isComplete(state)) {
       expect(toFaceletString(state)).toBe('UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB');
+    } else {
+      throw new Error('State should be complete');
     }
   });
 
@@ -55,7 +57,7 @@ describe('cubeState', () => {
     
     const result = validateCubeState(state);
     expect(result.valid).toBe(false);
-    expect(result.error).toContain('흰색 칸이 8개로 잘못 인식됐어요');
+    expect(result.error).toContain('흰색으로 잘못 인식된 칸이 8개 있어요');
   });
 
   it('should fail validation if centers are wrong', () => {
@@ -70,7 +72,10 @@ describe('cubeState', () => {
     };
     
     // Adjust one R to U to pass count check
-    state.faces.R![0] = 'U';
+    const rFace = state.faces.R;
+    if (rFace) {
+      rFace[0] = 'U';
+    }
     
     const result = validateCubeState(state);
     expect(result.valid).toBe(false);

@@ -38,21 +38,6 @@ export function createEmptyCubeState(): CubeState {
 }
 
 /**
- * 한국어 조사 "(으)로" 선택. 마지막 글자에 받침이 있으면 "으로",
- * 없거나 받침이 ㄹ이면 "로".
- */
-export function josaEuro(word: string): string {
-  if (!word) return '로';
-  const lastChar = word[word.length - 1];
-  const code = lastChar.charCodeAt(0);
-  // Hangul Syllables block: U+AC00..U+D7A3
-  if (code < 0xac00 || code > 0xd7a3) return '로';
-  const jong = (code - 0xac00) % 28;
-  // jong === 0: no final consonant; jong === 8: ㄹ → both take "로"
-  return jong === 0 || jong === 8 ? '로' : '으로';
-}
-
-/**
  * 6면 모두 캡처되었는지
  */
 export function isComplete(state: CubeState): state is CompletedCubeState {
@@ -74,6 +59,14 @@ export interface ValidationResult {
   error?: string;
 }
 
+export function getKoreanParticle(name: string): string {
+  const lastChar = name.charCodeAt(name.length - 1);
+  if (lastChar < 0xac00 || lastChar > 0xd7a3) return '로';
+  const batchimIndex = (lastChar - 0xac00) % 28;
+  // batchimIndex 0 is no batchim, 8 is 'ㄹ'. Both take '로'.
+  return batchimIndex > 0 && batchimIndex !== 8 ? '으로' : '로';
+}
+
 export function validateCubeState(state: CubeState): ValidationResult {
   if (!isComplete(state)) {
     return { valid: false, error: '아직 모든 면을 다 보여주지 않았어요' };
@@ -91,9 +84,10 @@ export function validateCubeState(state: CubeState): ValidationResult {
   }
   for (const colorKey of FACE_ORDER) {
     if (counts[colorKey] !== 9) {
+      const colorName = COLOR_NAME_KR[colorKey];
       return {
         valid: false,
-        error: `${COLOR_NAME_KR[colorKey]} 칸이 ${counts[colorKey]}개로 잘못 인식됐어요 (9개 필요)`,
+        error: `${colorName}${getKoreanParticle(colorName)} 잘못 인식된 칸이 ${counts[colorKey]}개 있어요 (9개 필요)`,
       };
     }
   }
@@ -105,7 +99,7 @@ export function validateCubeState(state: CubeState): ValidationResult {
       const detectedName = COLOR_NAME_KR[faceColors[4] as CubeColor];
       return {
         valid: false,
-        error: `${FACE_NAME_KR[faceKey]} 중앙이 ${detectedName}${josaEuro(detectedName)} 잘못 인식됐어요`,
+        error: `${FACE_NAME_KR[faceKey]} 중앙이 ${detectedName}${getKoreanParticle(detectedName)} 잘못 인식됐어요`,
       };
     }
   }

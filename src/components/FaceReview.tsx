@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { COLOR_HEX, COLOR_NAME_KR, type CubeColor } from '../lib/colorDetector';
 import { FACE_NAME_KR, FACE_ORDER } from '../lib/cubeState';
 
@@ -14,6 +15,41 @@ const ALL_COLORS: CubeColor[] = ['U', 'R', 'F', 'D', 'L', 'B'];
 
 export function FaceReview({ faces, onChange, onConfirm, onRetake, validationError }: FaceReviewProps) {
   const [editingCell, setEditingCell] = useState<{ face: CubeColor; idx: number } | null>(null);
+
+  useEffect(() => {
+    if (!editingCell) return;
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setEditingCell(null);
+    };
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [editingCell]);
+
+  const modal = editingCell && (
+    <div className="color-picker-modal" onClick={() => setEditingCell(null)}>
+      <div className="color-picker-content" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+        <div className="picker-title">색깔을 골라줘</div>
+        <div className="picker-grid">
+          {ALL_COLORS.map((c) => (
+            <button
+              key={c}
+              className="picker-cell"
+              style={{ background: COLOR_HEX[c] }}
+              onClick={() => {
+                onChange(editingCell.face, editingCell.idx, c);
+                setEditingCell(null);
+              }}
+            >
+              {COLOR_NAME_KR[c]}
+            </button>
+          ))}
+        </div>
+        <button className="btn-ghost" onClick={() => setEditingCell(null)}>
+          취소
+        </button>
+      </div>
+    </div>
+  );
 
   return (
     <div className="face-review">
@@ -61,35 +97,11 @@ export function FaceReview({ faces, onChange, onConfirm, onRetake, validationErr
         })}
       </div>
 
-      {editingCell && (
-        <div className="color-picker-modal" onClick={() => setEditingCell(null)}>
-          <div className="color-picker-content" onClick={(e) => e.stopPropagation()}>
-            <div className="picker-title">색깔을 골라줘</div>
-            <div className="picker-grid">
-              {ALL_COLORS.map((c) => (
-                <button
-                  key={c}
-                  className="picker-cell"
-                  style={{ background: COLOR_HEX[c] }}
-                  onClick={() => {
-                    onChange(editingCell.face, editingCell.idx, c);
-                    setEditingCell(null);
-                  }}
-                >
-                  {COLOR_NAME_KR[c]}
-                </button>
-              ))}
-            </div>
-            <button className="btn-ghost" onClick={() => setEditingCell(null)}>
-              취소
-            </button>
-          </div>
-        </div>
-      )}
-
       <button className="btn-primary btn-large" onClick={onConfirm}>
         다 맞아! 풀어줘 🪄
       </button>
+
+      {editingCell && createPortal(modal, document.body)}
     </div>
   );
 }
