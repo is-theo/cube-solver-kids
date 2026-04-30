@@ -40,8 +40,9 @@ export function saveCalibration(data: CalibrationData): boolean {
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     return true;
-  } catch {
+  } catch (e) {
     // QuotaExceededError, SecurityError(private mode), etc.
+    console.error('Failed to save calibration:', e);
     return false;
   }
 }
@@ -57,7 +58,8 @@ export function loadCalibration(): CalibrationData | null {
   if (!saved) return null;
   try {
     return JSON.parse(saved);
-  } catch {
+  } catch (e) {
+    console.error('Failed to load calibration:', e);
     return null;
   }
 }
@@ -80,18 +82,22 @@ export function deltaE(lab1: Lab, lab2: Lab): number {
   return deltaE2000(lab1, lab2);
 }
 
-// 기본 참조값 (D65 기준 대략적인 Lab 값들)
+// 기본 참조값 (D65 기준 큐브 스티커의 일반적인 Lab 값)
+// sRGB 순수값보다 실제 무광/유광 스티커의 반사율과 측정된 평균치를 고려하여 조정됨.
+// 사용자의 조명 환경에 따라 캘리브레이션을 통해 보정하는 것이 가장 정확합니다.
 const DEFAULT_REFERENCES: Record<CubeColor, Lab> = {
-  U: { L: 95, a: 0, b: 0 },    // White
-  R: { L: 45, a: 65, b: 45 },  // Red
-  F: { L: 75, a: -65, b: 45 }, // Green
-  D: { L: 85, a: 0, b: 85 },   // Yellow
-  L: { L: 65, a: 45, b: 75 },  // Orange
-  B: { L: 40, a: 0, b: -50 },  // Blue
+  U: { L: 95, a: 0, b: 0 },      // White (흰색)
+  R: { L: 53, a: 80, b: 67 },    // Red (빨간색)
+  F: { L: 88, a: -79, b: 81 },   // Green (초록색)
+  D: { L: 97, a: -12, b: 95 },   // Yellow (노란색)
+  L: { L: 67, a: 51, b: 82 },    // Orange (주황색)
+  B: { L: 45, a: -15, b: -55 },  // Blue (파란색)
 };
 
 export interface ClassificationResult {
   color: CubeColor;
+  /** 가장 가까운 참조색까지의 ΔE2000 거리 */
+  distance: number;
   bestDistance: number;
   secondDistance: number;
   /** 0..1, 1.0 means perfect match. (second - best) / second. */
@@ -134,7 +140,13 @@ export function classifyColorWithConfidence(
       ? Math.max(0, Math.min(1, (secondDistance - bestDistance) / secondDistance))
       : 1;
 
-  return { color: bestColor, bestDistance, secondDistance, confidence };
+  return {
+    color: bestColor,
+    distance: bestDistance,
+    bestDistance,
+    secondDistance,
+    confidence,
+  };
 }
 
 /**
@@ -160,6 +172,8 @@ export interface CellResult {
   lab: Lab;
   /** 0..1, 1.0이면 인접 색상과 거리가 멀어 매우 확신, 0.3 미만이면 불확실. */
   confidence: number;
+  /** 가장 가까운 참조색까지의 ΔE2000 거리 */
+  distance: number;
 }
 
 const SAMPLE_SIZE = 13; // 5 → 13: 169픽셀로 노이즈/스페큘러 하이라이트에 더 강건.
@@ -219,8 +233,8 @@ export function extract9Cells(
         (1 - u) * v * corners[3].y;
 
       const data = ctx.getImageData(
-        Math.floor(x - SAMPLE_SIZE / 2),
-        Math.floor(y - SAMPLE_SIZE / 2),
+        Math.max(0, Math.floor(x - SAMPLE_SIZE / 2)),
+        Math.max(0, Math.floor(y - SAMPLE_SIZE / 2)),
         SAMPLE_SIZE,
         SAMPLE_SIZE,
       ).data;
@@ -233,6 +247,7 @@ export function extract9Cells(
         rgb: [medR, medG, medB],
         lab: rgbToLab(medR, medG, medB),
         confidence: cls.confidence,
+        distance: cls.distance,
       });
     }
   }

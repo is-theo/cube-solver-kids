@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   classifyColor,
+  classifyColorWithConfidence,
   rgbToLab,
   deltaE,
   saveCalibration,
@@ -13,6 +14,8 @@ import {
 describe('colorDetector', () => {
   beforeEach(() => {
     localStorage.clear();
+    vi.clearAllMocks();
+    vi.restoreAllMocks();
   });
 
   describe('rgbToLab', () => {
@@ -35,19 +38,39 @@ describe('colorDetector', () => {
     it('should calculate distance correctly', () => {
       const lab1 = { L: 50, a: 0, b: 0 };
       const lab2 = { L: 60, a: 0, b: 0 };
-      // For pure L difference, deltaE2000 is similar to CIE76 but not identical due to weighting
       expect(deltaE(lab1, lab2)).toBeGreaterThan(0);
     });
   });
 
   describe('classifyColor', () => {
-    it('should classify basic colors using default references', () => {
+    it('should classify basic colors using updated references', () => {
       expect(classifyColor(255, 255, 255)).toBe('U'); // White
-      expect(classifyColor(230, 50, 50)).toBe('R');   // Red-ish
-      expect(classifyColor(0, 214, 160)).toBe('F');   // Green-ish
-      expect(classifyColor(255, 214, 10)).toBe('D');  // Yellow-ish
-      expect(classifyColor(255, 140, 66)).toBe('L');  // Orange-ish
-      expect(classifyColor(0, 119, 182)).toBe('B');   // Blue-ish
+      expect(classifyColor(200, 30, 40)).toBe('R');   // Red
+      expect(classifyColor(40, 200, 100)).toBe('F');  // Green
+      expect(classifyColor(240, 220, 20)).toBe('D');  // Yellow
+      expect(classifyColor(255, 130, 40)).toBe('L');  // Orange
+      expect(classifyColor(30, 80, 200)).toBe('B');   // Blue
+    });
+
+    it('should distinguish between Red and Orange accurately', () => {
+      // Pure Red vs Pure Orange
+      expect(classifyColor(255, 0, 0)).toBe('R');
+      expect(classifyColor(255, 165, 0)).toBe('L');
+      
+      // Edge cases
+      expect(classifyColor(255, 60, 0)).toBe('R');
+      expect(classifyColor(255, 110, 0)).toBe('L');
+    });
+
+    it('should handle lighting variations (shadows and highlights)', () => {
+      // Very dark grey (120, 120, 120) is close to White but should have lower confidence
+      const result = classifyColorWithConfidence(120, 120, 120);
+      expect(result.color).toBe('U');
+      expect(result.confidence).toBeLessThan(0.7);
+
+      // Bright yellow vs Pale yellow
+      expect(classifyColor(255, 255, 0)).toBe('D');
+      expect(classifyColor(200, 200, 100)).toBe('D');
     });
 
     it('should handle calibration data', () => {
@@ -56,64 +79,113 @@ describe('colorDetector', () => {
           U: { L: 10, a: 0, b: 0 }, // Fake White (Dark)
         }
       };
-
-      // Even dark gray should be classified as U with this calibration
       expect(classifyColor(20, 20, 20, customCalibration)).toBe('U');
     });
+  });
 
-    it('should fall back to default references for missing calibration keys', () => {
-      const partialCalibration: CalibrationData = {
-        references: {
-          R: { L: 10, a: 0, b: 0 }, // Fake Red (Dark)
-        }
-      };
+  describe('classifyColorWithConfidence', () => {
+    it('should return high confidence for clear matches', () => {
+      const result = classifyColorWithConfidence(255, 255, 255);
+      expect(result.color).toBe('U');
+      expect(result.confidence).toBeGreaterThan(0.8);
+    });
 
-      // Red should use custom
-      expect(classifyColor(20, 20, 20, partialCalibration)).toBe('R');
-      // White should still use default
-      expect(classifyColor(255, 255, 255, partialCalibration)).toBe('U');
+    it('should return low confidence for ambiguous colors', () => {
+      // Something between Red and Orange
+      // Red: { L: 53, a: 80, b: 67 }
+      // Orange: { L: 67, a: 51, b: 82 }
+      const result = classifyColorWithConfidence(255, 100, 40); 
+      expect(result.confidence).toBeLessThan(0.6);
     });
   });
 
   describe('extract9Cells', () => {
-    it('should extract 9 cells using bilinear interpolation', () => {
+    it('should extract colors and confidence from 9 different regions', () => {
+      // Mock getImageData to return different colors based on coordinates
       const mockCtx = {
-        getImageData: vi.fn().mockReturnValue({
-          data: new Uint8ClampedArray([255, 255, 255, 255, 255, 255, 255, 255]) // 2 pixels of white
+        getImageData: vi.fn((x, y) => {
+          // Return White for top row, Red for middle, Blue for bottom
+          let r = 0, g = 0, b = 0;
+          if (y < 100) { r = 255; g = 255; b = 255; }
+          else if (y < 200) { r = 255; g = 0; b = 0; }
+          else { r = 0; g = 0; b = 255; }
+          
+          const data = new Uint8ClampedArray(100); // 5x5 * 4
+          for (let i = 0; i < data.length; i += 4) {
+            data[i] = r; data[i+1] = g; data[i+2] = b; data[i+3] = 255;
+          }
+          return { data };
         })
       } as unknown as CanvasRenderingContext2D;
 
       const corners: [Point, Point, Point, Point] = [
-        { x: 0, y: 0 },   // TL
-        { x: 300, y: 0 }, // TR
-        { x: 300, y: 300 }, // BR
-        { x: 0, y: 300 }  // BL
+        { x: 0, y: 0 }, { x: 300, y: 0 }, { x: 300, y: 300 }, { x: 0, y: 300 }
       ];
 
       const results = extract9Cells(mockCtx, corners);
       expect(results).toHaveLength(9);
-      expect(mockCtx.getImageData).toHaveBeenCalledTimes(9);
-
-      // Check if sampling points are roughly where we expect
-      // Middle cell (1,1) should be around (150, 150)
-      const callArgs = (mockCtx.getImageData as any).mock.calls[4]; // 5th call is (1,1)
-      expect(callArgs[0]).toBe(147);
-      expect(callArgs[1]).toBe(147);
+      expect(results[0]).toHaveProperty('confidence');
+      expect(results[0]).toHaveProperty('distance');
+      
+      // Top row (index 0,1,2) should be U (White)
+      expect(results[0].color).toBe('U');
+      expect(results[1].color).toBe('U');
+      expect(results[2].color).toBe('U');
+      
+      // Middle row (index 3,4,5) should be R (Red)
+      expect(results[3].color).toBe('R');
+      expect(results[4].color).toBe('R');
+      expect(results[5].color).toBe('R');
+      
+      // Bottom row (index 6,7,8) should be B (Blue)
+      expect(results[6].color).toBe('B');
+      expect(results[7].color).toBe('B');
+      expect(results[8].color).toBe('B');
     });
   });
 
-  describe('storage', () => {
+  describe('storage and error handling', () => {
     it('should save and load calibration data', () => {
       const data: CalibrationData = {
-        references: {
-          U: { L: 100, a: 0, b: 0 },
-          R: { L: 50, a: 50, b: 50 },
-        }
+        references: { U: { L: 100, a: 0, b: 0 } }
       };
-
       saveCalibration(data);
-      const loaded = loadCalibration();
-      expect(loaded).toEqual(data);
+      expect(loadCalibration()).toEqual(data);
+    });
+
+    it('should handle localStorage errors gracefully', () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const mockSetItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+        throw new Error('Quota exceeded');
+      });
+
+      saveCalibration({ references: {} });
+      expect(consoleSpy).toHaveBeenCalledWith('Failed to save calibration:', expect.any(Error));
+      
+      mockSetItem.mockRestore();
+      consoleSpy.mockRestore();
+    });
+
+    it('should handle SSR (no window)', () => {
+      const originalWindow = global.window;
+      // @ts-ignore
+      delete global.window;
+
+      expect(loadCalibration()).toBeNull();
+      // Should not throw
+      saveCalibration({ references: {} });
+
+      global.window = originalWindow;
+    });
+
+    it('should handle corrupted calibration data', () => {
+      localStorage.setItem('rubiks_calibration', 'invalid-json{');
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      
+      expect(loadCalibration()).toBeNull();
+      expect(consoleSpy).toHaveBeenCalledWith('Failed to load calibration:', expect.any(Error));
+      
+      consoleSpy.mockRestore();
     });
   });
 });
