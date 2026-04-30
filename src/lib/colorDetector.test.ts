@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { classifyColor, rgbToLab, deltaE } from './colorDetector';
+import { classifyColor, rgbToLab, deltaE, type CalibrationData } from './colorDetector';
 
 describe('colorDetector', () => {
   describe('rgbToLab', () => {
@@ -39,7 +39,7 @@ describe('colorDetector', () => {
     });
 
     it('should handle calibration data', () => {
-      const customCalibration = {
+      const customCalibration: CalibrationData = {
         references: {
           U: { l: 10, a: 0, b: 0 }, // Fake White (Dark)
           R: { l: 45, a: 65, b: 45 },
@@ -51,7 +51,7 @@ describe('colorDetector', () => {
       };
       
       // Even dark gray should be classified as U with this calibration
-      expect(classifyColor(20, 20, 20, customCalibration as any)).toBe('U');
+      expect(classifyColor(20, 20, 20, customCalibration)).toBe('U');
     });
   });
 });

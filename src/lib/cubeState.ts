@@ -87,9 +87,12 @@ export function validateCubeState(state: CubeState): ValidationResult {
   for (const faceKey of FACE_ORDER) {
     const faceColors = state.faces[faceKey];
     if (faceColors && faceColors[4] !== faceKey) {
+      const colorName = COLOR_NAME_KR[faceColors[4] as CubeColor];
+      // 받침이 있으면 '으로', 없으면 '로' (빨강은 받침 'ㅇ'이 있으므로 '으로')
+      const particle = (colorName.charCodeAt(colorName.length - 1) - 0xac00) % 28 > 0 ? '으로' : '로';
       return {
         valid: false,
-        error: `${FACE_NAME_KR[faceKey]} 중앙이 ${COLOR_NAME_KR[faceColors[4] as CubeColor]}로 잘못 인식됐어요`,
+        error: `${FACE_NAME_KR[faceKey]} 중앙이 ${colorName}${particle} 잘못 인식됐어요`,
       };
     }
   }

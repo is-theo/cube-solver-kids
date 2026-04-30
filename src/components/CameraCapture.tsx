@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useCamera } from '../hooks/useCamera';
 import {
   extract9Cells,
@@ -6,7 +6,6 @@ import {
   COLOR_NAME_KR,
   loadCalibration,
   saveCalibration,
-  rgbToLab,
 } from '../lib/colorDetector';
 import type { CubeColor, Point, CalibrationData, Lab } from '../lib/colorDetector';
 
@@ -48,6 +47,7 @@ export function CameraCapture({ targetFace, instructionText, onCaptured, onSkip 
   const lastColorsRef = useRef<string>('');
   const lastPreviewPushRef = useRef<number>(0);
   const rafRef = useRef<number>(0);
+  const calibRafRef = useRef<number>(0);
   const videoSizeRef = useRef({ w: 0, h: 0 });
 
   // 초기 그리드 설정 (비디오 로드 후 한 번)
@@ -166,7 +166,7 @@ export function CameraCapture({ targetFace, instructionText, onCaptured, onSkip 
       octx.closePath();
       octx.stroke();
 
-      // 내부 격자 (Bilinear interpolation style lines)
+      // 내부 격자
       octx.lineWidth = 1.5;
       for (let i = 1; i < 3; i++) {
         const t = i / 3;
@@ -201,19 +201,22 @@ export function CameraCapture({ targetFace, instructionText, onCaptured, onSkip 
       const video = videoRef.current;
       const canvas = canvasRef.current;
       if (!video || !canvas || video.videoWidth === 0) {
-        rafRef.current = requestAnimationFrame(tick);
+        calibRafRef.current = requestAnimationFrame(tick);
         return;
       }
       const ctx = canvas.getContext('2d', { willReadFrequently: true });
       if (ctx) {
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const cells = extract9Cells(ctx, corners, undefined); // raw color detection
+        const cells = extract9Cells(ctx, corners, undefined);
         setLivePreview(cells);
       }
-      rafRef.current = requestAnimationFrame(tick);
+      calibRafRef.current = requestAnimationFrame(tick);
     };
-    rafRef.current = requestAnimationFrame(tick);
-    return () => { stopped = true; cancelAnimationFrame(rafRef.current); };
+    calibRafRef.current = requestAnimationFrame(tick);
+    return () => {
+      stopped = true;
+      cancelAnimationFrame(calibRafRef.current);
+    };
   }, [ready, isCalibrating, corners]);
 
   useEffect(() => {
@@ -221,7 +224,7 @@ export function CameraCapture({ targetFace, instructionText, onCaptured, onSkip 
     const centerOk = livePreview[4].color === targetFace;
     if (stable && centerOk && countdown === null) {
       setCountdown(3);
-      lockCamera(); // 캡처 직전 카메라 고정 시도
+      lockCamera();
     } else if (!stable && countdown !== null) {
       setCountdown(null);
       unlockCamera();
@@ -294,7 +297,7 @@ export function CameraCapture({ targetFace, instructionText, onCaptured, onSkip 
         <canvas ref={canvasRef} style={{ display: 'none' }} />
         <canvas ref={overlayCanvasRef} className="overlay-canvas" />
 
-        {!isCalibrating && corners.map((p, i) => (
+        {!isCalibrating && videoSizeRef.current.w > 0 && corners.map((p, i) => (
           <div
             key={i}
             className="corner-handle"

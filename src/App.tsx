@@ -69,10 +69,6 @@ export default function App() {
       setValidationError(result.error || '큐브 상태가 이상해요');
       return;
     }
-    if (!isComplete(cubeState)) {
-      setValidationError('아직 모든 면을 다 보여주지 않았어요');
-      return;
-    }
     setValidationError(null);
     setPhase('solving');
     setSolverError(null);

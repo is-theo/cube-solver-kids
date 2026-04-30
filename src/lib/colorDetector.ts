@@ -119,7 +119,7 @@ const DEFAULT_REFERENCES: Record<CubeColor, Lab> = {
  */
 export function classifyColor(r: number, g: number, b: number, calibration?: CalibrationData): CubeColor {
   const currentLab = rgbToLab(r, g, b);
-  const references = calibration?.references || DEFAULT_REFERENCES;
+  const references = { ...DEFAULT_REFERENCES, ...(calibration?.references || {}) };
 
   let minDistance = Infinity;
   let closest: CubeColor = 'U';

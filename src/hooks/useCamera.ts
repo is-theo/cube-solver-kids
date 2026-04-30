@@ -44,6 +44,7 @@ export function useCamera(): UseCameraResult {
           setReady(true);
         }
       } catch (e: any) {
+        if (cancelled || e.name === 'AbortError') return;
         const msg =
           e.name === 'NotAllowedError'
             ? '카메라 권한이 필요해! 브라우저에서 허용해줘 📷'
