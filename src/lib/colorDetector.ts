@@ -63,25 +63,63 @@ const DEFAULT_REFERENCES: Record<CubeColor, Lab> = {
   B: { L: 40, a: 0, b: -50 },  // Blue
 };
 
-/**
- * Lab 색공간 기반 분류
- */
-export function classifyColor(r: number, g: number, b: number, calibration?: CalibrationData): CubeColor {
-  const currentLab = rgbToLab(r, g, b);
-  const references = { ...DEFAULT_REFERENCES, ...(calibration?.references || {}) };
+export interface ClassificationResult {
+  color: CubeColor;
+  bestDistance: number;
+  secondDistance: number;
+  /** 0..1, 1.0 means perfect match. (second - best) / second. */
+  confidence: number;
+}
 
-  let minDistance = Infinity;
-  let closest: CubeColor = 'U';
+/**
+ * Lab 색공간 기반 분류 + 차순위까지 거리 산출.
+ * confidence는 (2nd - best) / 2nd 로 정의 — 인접 색상과 얼마나 떨어져 있는지를 나타낸다.
+ */
+export function classifyColorWithConfidence(
+  r: number,
+  g: number,
+  b: number,
+  calibration?: CalibrationData,
+): ClassificationResult {
+  const currentLab = rgbToLab(r, g, b);
+  const references: Record<CubeColor, Lab> = {
+    ...DEFAULT_REFERENCES,
+    ...(calibration?.references || {}),
+  };
+
+  let bestColor: CubeColor = 'U';
+  let bestDistance = Infinity;
+  let secondDistance = Infinity;
 
   (Object.keys(references) as CubeColor[]).forEach((color) => {
-    const dist = deltaE(currentLab, references[color]!);
-    if (dist < minDistance) {
-      minDistance = dist;
-      closest = color;
+    const dist = deltaE(currentLab, references[color]);
+    if (dist < bestDistance) {
+      secondDistance = bestDistance;
+      bestDistance = dist;
+      bestColor = color;
+    } else if (dist < secondDistance) {
+      secondDistance = dist;
     }
   });
 
-  return closest;
+  const confidence =
+    secondDistance > 0 && Number.isFinite(secondDistance)
+      ? Math.max(0, Math.min(1, (secondDistance - bestDistance) / secondDistance))
+      : 1;
+
+  return { color: bestColor, bestDistance, secondDistance, confidence };
+}
+
+/**
+ * Lab 색공간 기반 분류
+ */
+export function classifyColor(
+  r: number,
+  g: number,
+  b: number,
+  calibration?: CalibrationData,
+): CubeColor {
+  return classifyColorWithConfidence(r, g, b, calibration).color;
 }
 
 export interface Point {
@@ -89,15 +127,51 @@ export interface Point {
   y: number;
 }
 
+export interface CellResult {
+  color: CubeColor;
+  rgb: [number, number, number];
+  lab: Lab;
+  /** 0..1, 1.0이면 인접 색상과 거리가 멀어 매우 확신, 0.3 미만이면 불확실. */
+  confidence: number;
+}
+
+const SAMPLE_SIZE = 13; // 5 → 13: 169픽셀로 노이즈/스페큘러 하이라이트에 더 강건.
+
 /**
- * 4개의 코너 포인트를 기반으로 9칸의 색상 추출 (빌리니어 보간)
+ * 픽셀 배열에서 채널별 중앙값(median) 계산.
+ * 평균보다 광택 반사(specular highlight)나 음영 픽셀에 둔감하다.
+ */
+function medianRgb(data: Uint8ClampedArray): [number, number, number] {
+  const n = data.length / 4;
+  const rs = new Array<number>(n);
+  const gs = new Array<number>(n);
+  const bs = new Array<number>(n);
+  for (let i = 0, p = 0; i < data.length; i += 4, p++) {
+    rs[p] = data[i];
+    gs[p] = data[i + 1];
+    bs[p] = data[i + 2];
+  }
+  rs.sort((a, b) => a - b);
+  gs.sort((a, b) => a - b);
+  bs.sort((a, b) => a - b);
+  const mid = Math.floor(n / 2);
+  return [rs[mid], gs[mid], bs[mid]];
+}
+
+/**
+ * 4개의 코너 포인트를 기반으로 9칸의 색상 추출 (빌리니어 보간 + 중앙값 샘플링).
+ *
+ * 정확도 개선 포인트:
+ * - 13×13 큰 샘플 영역으로 노이즈 평균화.
+ * - 채널별 median으로 큐브 표면 광택 반사를 무시.
+ * - 거리 차순위까지 산출해 confidence 제공.
  */
 export function extract9Cells(
   ctx: CanvasRenderingContext2D,
   corners: [Point, Point, Point, Point], // TL, TR, BR, BL
-  calibration?: CalibrationData
-): { color: CubeColor; rgb: [number, number, number]; lab: Lab }[] {
-  const result: { color: CubeColor; rgb: [number, number, number]; lab: Lab }[] = [];
+  calibration?: CalibrationData,
+): CellResult[] {
+  const result: CellResult[] = [];
 
   for (let row = 0; row < 3; row++) {
     for (let col = 0; col < 3; col++) {
@@ -117,29 +191,21 @@ export function extract9Cells(
         u * v * corners[2].y +
         (1 - u) * v * corners[3].y;
 
-      const sampleSize = 5;
       const data = ctx.getImageData(
-        Math.floor(x - sampleSize / 2),
-        Math.floor(y - sampleSize / 2),
-        sampleSize,
-        sampleSize
+        Math.floor(x - SAMPLE_SIZE / 2),
+        Math.floor(y - SAMPLE_SIZE / 2),
+        SAMPLE_SIZE,
+        SAMPLE_SIZE,
       ).data;
 
-      let r = 0, g = 0, b = 0;
-      const pixelCount = data.length / 4;
-      for (let i = 0; i < data.length; i += 4) {
-        r += data[i];
-        g += data[i + 1];
-        b += data[i + 2];
-      }
-      const avgR = r / pixelCount;
-      const avgG = g / pixelCount;
-      const avgB = b / pixelCount;
+      const [medR, medG, medB] = medianRgb(data);
+      const cls = classifyColorWithConfidence(medR, medG, medB, calibration);
 
       result.push({
-        color: classifyColor(avgR, avgG, avgB, calibration),
-        rgb: [Math.round(avgR), Math.round(avgG), Math.round(avgB)],
-        lab: rgbToLab(avgR, avgG, avgB),
+        color: cls.color,
+        rgb: [medR, medG, medB],
+        lab: rgbToLab(medR, medG, medB),
+        confidence: cls.confidence,
       });
     }
   }
