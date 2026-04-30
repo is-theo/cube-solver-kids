@@ -1,3 +1,4 @@
+import type CubeJs from 'cubejs';
 import type { CubeColor } from './colorDetector';
 
 // 면 캡처 순서 (사용자 가이드 순서)
@@ -26,6 +27,10 @@ export interface CubeState {
   faces: Record<CubeColor, CubeColor[] | null>;
 }
 
+export type CompletedCubeState = CubeState & {
+  faces: Record<CubeColor, CubeColor[]>;
+};
+
 export function createEmptyCubeState(): CubeState {
   return {
     faces: { U: null, R: null, F: null, D: null, L: null, B: null },
@@ -35,15 +40,15 @@ export function createEmptyCubeState(): CubeState {
 /**
  * 6면 모두 캡처되었는지
  */
-export function isComplete(state: CubeState): boolean {
+export function isComplete(state: CubeState): state is CompletedCubeState {
   return FACE_ORDER.every((f) => state.faces[f] !== null);
 }
 
 /**
- * cubejs로 보낼 54자리 faceletString 생성
+ * cubejs로 보낼 54자리 faceletString 생성. 완전 캡처된 상태에서만 호출 가능.
  */
-export function toFaceletString(state: CubeState): string {
-  return FACE_ORDER.map((f) => state.faces[f]!.join('')).join('');
+export function toFaceletString(state: CompletedCubeState): string {
+  return FACE_ORDER.map((f) => state.faces[f].join('')).join('');
 }
 
 /**
@@ -62,7 +67,7 @@ export function validateCubeState(state: CubeState): ValidationResult {
   // 1. 각 색상이 정확히 9개씩인지
   const counts: Record<CubeColor, number> = { U: 0, R: 0, F: 0, D: 0, L: 0, B: 0 };
   for (const face of FACE_ORDER) {
-    for (const color of state.faces[face]!) {
+    for (const color of state.faces[face]) {
       counts[color]++;
     }
   }
@@ -77,10 +82,10 @@ export function validateCubeState(state: CubeState): ValidationResult {
 
   // 2. 각 면 중심이 그 면의 색이어야 함
   for (const face of FACE_ORDER) {
-    if (state.faces[face]![4] !== face) {
+    if (state.faces[face][4] !== face) {
       return {
         valid: false,
-        error: `${face}면 중앙이 ${state.faces[face]![4]}로 잘못 인식됐어요`,
+        error: `${face}면 중앙이 ${state.faces[face][4]}로 잘못 인식됐어요`,
       };
     }
   }
@@ -91,18 +96,39 @@ export function validateCubeState(state: CubeState): ValidationResult {
 /**
  * cubejs 동적 import (번들 크기 고려)
  */
-let CubeLib: any = null;
+type CubeCtor = typeof CubeJs;
+let CubeLib: CubeCtor | null = null;
 let solverInitialized = false;
+let initPromise: Promise<void> | null = null;
 
+async function loadCubeLib(): Promise<CubeCtor> {
+  if (CubeLib) return CubeLib;
+  const mod = await import('cubejs');
+  // ESM/CJS 호환
+  const ctor = (mod as unknown as { default?: CubeCtor }).default ?? (mod as unknown as CubeCtor);
+  CubeLib = ctor;
+  return ctor;
+}
+
+/**
+ * 솔버 초기화. 약 5초 소요되므로 캡처 시작 시점에 미리 호출하면 대기 시간을 줄일 수 있다.
+ * 동시 호출은 동일한 promise를 공유한다.
+ */
 export async function initSolver(): Promise<void> {
   if (solverInitialized) return;
-  if (!CubeLib) {
-    const mod = await import('cubejs');
-    CubeLib = mod.default || mod;
+  if (initPromise) return initPromise;
+
+  initPromise = (async () => {
+    const Cube = await loadCubeLib();
+    Cube.initSolver();
+    solverInitialized = true;
+  })();
+
+  try {
+    await initPromise;
+  } finally {
+    initPromise = null;
   }
-  // initSolver는 약 5초 정도 걸리는 무거운 초기화
-  CubeLib.initSolver();
-  solverInitialized = true;
 }
 
 /**
@@ -111,10 +137,13 @@ export async function initSolver(): Promise<void> {
  */
 export async function solveCube(faceletString: string): Promise<string[]> {
   await initSolver();
+  if (!CubeLib) {
+    throw new Error('Cube solver failed to load');
+  }
   const cube = CubeLib.fromString(faceletString);
-  const solution: string = cube.solve();
+  const solution = cube.solve();
   if (!solution) return [];
-  return solution.split(' ').filter((s: string) => s.length > 0);
+  return solution.split(' ').filter((s) => s.length > 0);
 }
 
 /**
