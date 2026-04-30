@@ -102,9 +102,10 @@ export function validateCubeState(state: CubeState): ValidationResult {
   for (const faceKey of FACE_ORDER) {
     const faceColors = state.faces[faceKey];
     if (faceColors && faceColors[4] !== faceKey) {
+      const detectedName = COLOR_NAME_KR[faceColors[4] as CubeColor];
       return {
         valid: false,
-        error: `${FACE_NAME_KR[faceKey]} 중앙이 ${COLOR_NAME_KR[faceColors[4] as CubeColor]}로 잘못 인식됐어요`,
+        error: `${FACE_NAME_KR[faceKey]} 중앙이 ${detectedName}${josaEuro(detectedName)} 잘못 인식됐어요`,
       };
     }
   }

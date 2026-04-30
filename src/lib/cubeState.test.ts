@@ -20,7 +20,9 @@ describe('cubeState', () => {
       B: Array(9).fill('B'),
     };
     expect(isComplete(state)).toBe(true);
-    expect(toFaceletString(state as any)).toBe('UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB');
+    if (isComplete(state)) {
+      expect(toFaceletString(state)).toBe('UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB');
+    }
   });
 
   it('should validate a correct cube state', () => {
@@ -72,7 +74,7 @@ describe('cubeState', () => {
     
     const result = validateCubeState(state);
     expect(result.valid).toBe(false);
-    expect(result.error).toContain('윗면 (흰색 중심) 중앙이 빨강로 잘못 인식됐어요');
+    expect(result.error).toContain('윗면 (흰색 중심) 중앙이 빨강으로 잘못 인식됐어요');
   });
 
   it('should fail validation if state is incomplete', () => {
