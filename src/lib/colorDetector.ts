@@ -32,15 +32,21 @@ export interface CalibrationData {
 const STORAGE_KEY = 'rubiks_calibration';
 
 export function saveCalibration(data: CalibrationData) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  } catch (e) {
+    console.error('Failed to save calibration:', e);
+  }
 }
 
 export function loadCalibration(): CalibrationData | null {
-  const saved = localStorage.getItem(STORAGE_KEY);
-  if (!saved) return null;
+  if (typeof window === 'undefined') return null;
   try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (!saved) return null;
     return JSON.parse(saved);
-  } catch {
+  } catch (e) {
+    console.error('Failed to load calibration:', e);
     return null;
   }
 }
@@ -53,14 +59,15 @@ export function deltaE(lab1: Lab, lab2: Lab): number {
   return deltaE2000(lab1, lab2);
 }
 
-// 기본 참조값 (D65 기준 대략적인 Lab 값들)
+// 기본 참조값 (D65 기준 큐브 스티커의 일반적인 Lab 값)
+// sRGB 순수값보다 실제 무광/유광 스티커의 반사율을 고려하여 조정됨
 const DEFAULT_REFERENCES: Record<CubeColor, Lab> = {
-  U: { L: 95, a: 0, b: 0 },    // White
-  R: { L: 45, a: 65, b: 45 },  // Red
-  F: { L: 75, a: -65, b: 45 }, // Green
-  D: { L: 85, a: 0, b: 85 },   // Yellow
-  L: { L: 65, a: 45, b: 75 },  // Orange
-  B: { L: 40, a: 0, b: -50 },  // Blue
+  U: { L: 95, a: 0, b: 0 },      // White (흰색)
+  R: { L: 53, a: 80, b: 67 },    // Red (빨간색)
+  F: { L: 88, a: -79, b: 81 },   // Green (초록색)
+  D: { L: 97, a: -12, b: 95 },   // Yellow (노란색)
+  L: { L: 67, a: 51, b: 82 },    // Orange (주황색)
+  B: { L: 45, a: -15, b: -55 },  // Blue (파란색)
 };
 
 /**

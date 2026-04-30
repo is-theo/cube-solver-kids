@@ -79,7 +79,7 @@ describe('cubeState', () => {
     
     const result = validateCubeState(state);
     expect(result.valid).toBe(false);
-    expect(result.error).toContain('윗면 (흰색 중심) 중앙이 빨강으로 잘못 인식됐어요. 올바른 면을 보여주세요!');
+    expect(result.error).toContain('윗면 (흰색 중심) 중앙이 빨간색으로 잘못 인식됐어요. 올바른 면을 보여주세요!');
   });
 
   it('should fail validation if state is incomplete', () => {

@@ -90,6 +90,7 @@ export function CameraCapture({ targetFace, instructionText, onCaptured, onSkip 
     };
     const nextCalib: CalibrationData = { references: nextRefs };
     setCalibration(nextCalib);
+    saveCalibration(nextCalib); // 중간 단계에서도 저장하여 이탈 시 데이터 보존
 
     // 다음 색상 순서: U -> R -> F -> D -> L -> B
     const order: CubeColor[] = ['U', 'R', 'F', 'D', 'L', 'B'];
@@ -97,7 +98,6 @@ export function CameraCapture({ targetFace, instructionText, onCaptured, onSkip 
     if (idx < order.length - 1) {
       setCalibStep(order[idx + 1]);
     } else {
-      saveCalibration(nextCalib);
       setIsCalibrating(false);
       setCalibStep(null);
     }
