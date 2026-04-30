@@ -38,6 +38,21 @@ export function createEmptyCubeState(): CubeState {
 }
 
 /**
+ * 한국어 조사 "(으)로" 선택. 마지막 글자에 받침이 있으면 "으로",
+ * 없거나 받침이 ㄹ이면 "로".
+ */
+export function josaEuro(word: string): string {
+  if (!word) return '로';
+  const lastChar = word[word.length - 1];
+  const code = lastChar.charCodeAt(0);
+  // Hangul Syllables block: U+AC00..U+D7A3
+  if (code < 0xac00 || code > 0xd7a3) return '로';
+  const jong = (code - 0xac00) % 28;
+  // jong === 0: no final consonant; jong === 8: ㄹ → both take "로"
+  return jong === 0 || jong === 8 ? '로' : '으로';
+}
+
+/**
  * 6면 모두 캡처되었는지
  */
 export function isComplete(state: CubeState): state is CompletedCubeState {
