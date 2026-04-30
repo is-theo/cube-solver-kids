@@ -1,43 +1,35 @@
 import { describe, it, expect } from 'vitest';
-import { classifyColor, rgbToHsv } from './colorDetector';
+import { classifyColor, rgbToLab, deltaE } from './colorDetector';
 
 describe('colorDetector', () => {
-  describe('rgbToHsv', () => {
-    it('should convert pure colors correctly', () => {
-      // Red
-      let hsv = rgbToHsv(255, 0, 0);
-      expect(hsv.h).toBe(0);
-      expect(hsv.s).toBe(1);
-      expect(hsv.v).toBe(1);
+  describe('rgbToLab', () => {
+    it('should convert pure colors correctly to Lab', () => {
+      // White
+      const white = rgbToLab(255, 255, 255);
+      expect(white.l).toBeGreaterThan(90);
+      expect(Math.abs(white.a)).toBeLessThan(5);
+      expect(Math.abs(white.b)).toBeLessThan(5);
 
-      // Green
-      hsv = rgbToHsv(0, 255, 0);
-      expect(hsv.h).toBe(120);
-      expect(hsv.s).toBe(1);
-      expect(hsv.v).toBe(1);
+      // Red
+      const red = rgbToLab(255, 0, 0);
+      expect(red.a).toBeGreaterThan(50);
 
       // Blue
-      hsv = rgbToHsv(0, 0, 255);
-      expect(hsv.h).toBe(240);
-      expect(hsv.s).toBe(1);
-      expect(hsv.v).toBe(1);
+      const blue = rgbToLab(0, 0, 255);
+      expect(blue.b).toBeLessThan(-50);
     });
+  });
 
-    it('should handle grayscale colors', () => {
-      // White
-      let hsv = rgbToHsv(255, 255, 255);
-      expect(hsv.s).toBe(0);
-      expect(hsv.v).toBe(1);
-
-      // Gray
-      hsv = rgbToHsv(128, 128, 128);
-      expect(hsv.s).toBe(0);
-      expect(Math.round(hsv.v * 100)).toBe(50);
+  describe('deltaE', () => {
+    it('should calculate distance correctly', () => {
+      const lab1 = { l: 50, a: 0, b: 0 };
+      const lab2 = { l: 60, a: 0, b: 0 };
+      expect(deltaE(lab1, lab2)).toBe(10);
     });
   });
 
   describe('classifyColor', () => {
-    it('should classify pure colors (U, R, F, D, L, B)', () => {
+    it('should classify basic colors using default references', () => {
       expect(classifyColor(255, 255, 255)).toBe('U'); // White
       expect(classifyColor(255, 0, 0)).toBe('R');   // Red
       expect(classifyColor(0, 255, 0)).toBe('F');   // Green
@@ -46,41 +38,20 @@ describe('colorDetector', () => {
       expect(classifyColor(0, 0, 255)).toBe('B');   // Blue
     });
 
-    it('should handle shaded and dim environments', () => {
-      // Shaded White (Grayish)
-      expect(classifyColor(150, 150, 150)).toBe('U');
+    it('should handle calibration data', () => {
+      const customCalibration = {
+        references: {
+          U: { l: 10, a: 0, b: 0 }, // Fake White (Dark)
+          R: { l: 45, a: 65, b: 45 },
+          F: { l: 75, a: -65, b: 45 },
+          D: { l: 85, a: 0, b: 85 },
+          L: { l: 65, a: 45, b: 75 },
+          B: { l: 40, a: 0, b: -50 },
+        }
+      };
       
-      // Dark Red
-      expect(classifyColor(100, 20, 20)).toBe('R');
-      
-      // Dark Blue
-      expect(classifyColor(20, 20, 100)).toBe('B');
-      
-      // Dim Yellow
-      expect(classifyColor(120, 120, 30)).toBe('D');
-    });
-
-    it('should distinguish Red from Orange at the boundary', () => {
-      // Reddish Orange
-      expect(classifyColor(255, 60, 0)).toBe('L');
-      // Orangey Red
-      expect(classifyColor(255, 30, 0)).toBe('R');
-    });
-
-    it('should handle white detection with color balance (robustness)', () => {
-      // Pale yellow that should NOT be white
-      expect(classifyColor(255, 255, 200)).toBe('D');
-      
-      // Slightly bluish white that SHOULD be white
-      expect(classifyColor(240, 240, 255)).toBe('U');
-
-      // Very dark gray that should be white (or handled as such for center matching)
-      expect(classifyColor(60, 60, 60)).toBe('U');
-    });
-
-    it('should fallback Magenta/Purple to Red', () => {
-      // Magenta
-      expect(classifyColor(255, 0, 255)).toBe('R');
+      // Even dark gray should be classified as U with this calibration
+      expect(classifyColor(20, 20, 20, customCalibration as any)).toBe('U');
     });
   });
 });

@@ -5,6 +5,8 @@ interface UseCameraResult {
   ready: boolean;
   error: string | null;
   retry: () => void;
+  lockCamera: () => Promise<void>;
+  unlockCamera: () => Promise<void>;
 }
 
 export function useCamera(): UseCameraResult {
@@ -12,16 +14,16 @@ export function useCamera(): UseCameraResult {
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
+  const streamRef = useRef<MediaStream | null>(null);
 
   useEffect(() => {
-    let stream: MediaStream | null = null;
     let cancelled = false;
 
     async function start() {
       setError(null);
       setReady(false);
       try {
-        stream = await navigator.mediaDevices.getUserMedia({
+        const stream = await navigator.mediaDevices.getUserMedia({
           video: {
             facingMode: 'environment', // 모바일은 후면 카메라 우선
             width: { ideal: 1280 },
@@ -35,6 +37,7 @@ export function useCamera(): UseCameraResult {
           return;
         }
 
+        streamRef.current = stream;
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
           await videoRef.current.play();
@@ -55,16 +58,42 @@ export function useCamera(): UseCameraResult {
 
     return () => {
       cancelled = true;
-      if (stream) {
-        stream.getTracks().forEach((t) => t.stop());
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((t) => t.stop());
       }
     };
   }, [attempt]);
+
+  const setCameraLock = async (locked: boolean) => {
+    if (!streamRef.current) return;
+    const track = streamRef.current.getVideoTracks()[0];
+    if (!track) return;
+
+    const capabilities = (track as any).getCapabilities?.() || {};
+    const constraints: any = {};
+
+    if (capabilities.exposureMode?.includes(locked ? 'manual' : 'continuous')) {
+      constraints.exposureMode = locked ? 'manual' : 'continuous';
+    }
+    if (capabilities.whiteBalanceMode?.includes(locked ? 'manual' : 'continuous')) {
+      constraints.whiteBalanceMode = locked ? 'manual' : 'continuous';
+    }
+
+    if (Object.keys(constraints).length > 0) {
+      try {
+        await track.applyConstraints({ advanced: [constraints] } as any);
+      } catch (e) {
+        console.warn('Failed to apply camera constraints', e);
+      }
+    }
+  };
 
   return {
     videoRef,
     ready,
     error,
     retry: () => setAttempt((a) => a + 1),
+    lockCamera: () => setCameraLock(true),
+    unlockCamera: () => setCameraLock(false),
   };
 }
