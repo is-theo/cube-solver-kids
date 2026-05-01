@@ -4,6 +4,8 @@ import { Lab, rgbToLab, deltaE2000 } from './colorSpace';
 export type CubeColor = 'U' | 'R' | 'F' | 'D' | 'L' | 'B';
 // U=White(위), R=Red(오), F=Green(앞), D=Yellow(아래), L=Orange(왼), B=Blue(뒤)
 
+export const FACE_COLORS: CubeColor[] = ['U', 'R', 'F', 'D', 'L', 'B'];
+
 export const COLOR_HEX: Record<CubeColor, string> = {
   U: '#ffffff', // White
   R: '#e63946', // Red
@@ -179,7 +181,7 @@ export function solveColorAssignment(
     ...DEFAULT_REFERENCES,
     ...(calibration?.references || {}),
   };
-  const colorKeys = Object.keys(references) as CubeColor[];
+  const colorKeys = FACE_COLORS;
   
   const result = new Array<CubeColor | null>(allLabs.length).fill(null);
   const counts: Record<CubeColor, number> = { U: 0, R: 0, F: 0, D: 0, L: 0, B: 0 };

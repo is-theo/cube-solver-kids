@@ -630,6 +630,9 @@ body::before {
   transform: scale(0.92);
   outline: 2px solid var(--accent);
 }
+.mini-cell:not(:disabled):active {
+  transform: scale(0.85);
+}
 .mini-cell-center {
   cursor: default;
   position: relative;
@@ -695,7 +698,7 @@ body::before {
   transition: transform 0.1s, box-shadow 0.1s;
 }
 .picker-cell:hover { transform: translate(-1px, -1px); box-shadow: 4px 4px 0 var(--ink); }
-.picker-cell:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--ink); }
+.picker-cell:active { transform: translate(2px, 2px) scale(0.92); box-shadow: 1px 1px 0 var(--ink); }
 
 /* ============================
    Solver Guide

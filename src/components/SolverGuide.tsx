@@ -32,7 +32,7 @@ export function SolverGuide({ faces, solution, onRestart }: SolverGuideProps) {
         <div className="progress-bar">
           <div
             className="progress-fill"
-            style={{ width: `${Math.min(100, (step / Math.max(1, solution.length)) * 100)}%` }}
+            style={{ width: `${isDone ? 100 : Math.min(100, (step / Math.max(1, solution.length)) * 100)}%` }}
           />
         </div>
       </div>

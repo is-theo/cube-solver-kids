@@ -13,7 +13,7 @@ import {
   solveCube,
   type CubeState,
 } from './lib/cubeState';
-import { solveColorAssignment, type CubeColor, type Lab } from './lib/colorDetector';
+import { solveColorAssignment, loadCalibration, type CubeColor, type Lab } from './lib/colorDetector';
 
 type Phase = 'intro' | 'capturing' | 'review' | 'solving' | 'solution';
 
@@ -73,7 +73,8 @@ export default function App() {
       }
     }
 
-    const optimized = solveColorAssignment(allLabs);
+    const calibration = loadCalibration();
+    const optimized = solveColorAssignment(allLabs, calibration || undefined);
 
     // 다시 면별로 쪼개서 상태 업데이트
     setCubeState((prev) => {
