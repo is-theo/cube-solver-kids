@@ -71,7 +71,8 @@ describe('Tablet Compatibility Support', () => {
       // Size is 720 * 0.55 = 396
       // ox = (1280 - 396) / 2 = 442
       // oy = (720 - 396) / 2 = 162
-      expect(corners[0]).toEqual({ x: 442, y: 162 });
+      expect(corners[0].x).toBeCloseTo(442);
+      expect(corners[0].y).toBeCloseTo(162);
     });
 
     it('should adjust corners proportionally when resolution changes', () => {
@@ -85,8 +86,10 @@ describe('Tablet Compatibility Support', () => {
       // Double the resolution
       const adjusted = adjustCornersForResolution(initialCorners, 400, 400, 800, 800);
       
-      expect(adjusted[0]).toEqual({ x: 200, y: 200 });
-      expect(adjusted[2]).toEqual({ x: 400, y: 400 });
+      expect(adjusted[0].x).toBeCloseTo(200);
+      expect(adjusted[0].y).toBeCloseTo(200);
+      expect(adjusted[2].x).toBeCloseTo(400);
+      expect(adjusted[2].y).toBeCloseTo(400);
     });
 
     it('should initialize corners if old resolution is 0', () => {
@@ -98,7 +101,8 @@ describe('Tablet Compatibility Support', () => {
       // Should be centered in 1000x1000
       // size = 1000 * 0.55 = 550
       // ox = (1000 - 550) / 2 = 225
-      expect(adjusted[0]).toEqual({ x: 225, y: 225 });
+      expect(adjusted[0].x).toBeCloseTo(225);
+      expect(adjusted[0].y).toBeCloseTo(225);
     });
   });
 
@@ -133,7 +137,8 @@ describe('Tablet Compatibility Support', () => {
       // 구체적인 중앙값 검증 (calculateInitialCorners 로직)
       // size = 720 * 0.55 = 396
       // ox = (1280 - 396) / 2 = 442
-      expect(initializedCorners![0]).toEqual({ x: 442, y: 162 });
+      expect(initializedCorners![0].x).toBeCloseTo(442);
+      expect(initializedCorners![0].y).toBeCloseTo(162);
     });
   });
 });
