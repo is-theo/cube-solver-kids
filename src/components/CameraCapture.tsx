@@ -9,6 +9,7 @@ import {
   loadCalibration,
   saveCalibration,
 } from '../lib/colorDetector';
+import { calculateInitialCorners, adjustCornersForResolution } from '../lib/cameraUtils';
 import type { CubeColor, Point, CalibrationData, Lab } from '../lib/colorDetector';
 
 interface CameraCaptureProps {
@@ -78,24 +79,7 @@ export function CameraCapture({ targetFace, instructionText, onCaptured, onSkip 
           const oldH = videoSizeRef.current.h;
           videoSizeRef.current = { w: vw, h: vh };
 
-          if (oldW === 0) {
-            // 최초 로드 시 중앙에 그리드 배치
-            const size = Math.min(vw, vh) * 0.55;
-            const ox = (vw - size) / 2;
-            const oy = (vh - size) / 2;
-            setCorners([
-              { x: ox, y: oy },
-              { x: ox + size, y: oy },
-              { x: ox + size, y: oy + size },
-              { x: ox, y: oy + size },
-            ]);
-          } else {
-            // 해상도 변경 시 기존 코너 좌표 비율에 맞춰 조정
-            setCorners(prev => prev.map(p => ({
-              x: (p.x / oldW) * vw,
-              y: (p.y / oldH) * vh
-            })) as [Point, Point, Point, Point]);
-          }
+          setCorners(prev => adjustCornersForResolution(prev, oldW, oldH, vw, vh));
         }
       } else {
         rafId = requestAnimationFrame(checkSize);

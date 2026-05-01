@@ -33,7 +33,7 @@ npm run dev
 
 ### 외부 의존성 (Runtime Dependencies)
 - **MediaPipe**: `@mediapipe/hands`, `@mediapipe/camera_utils` 패키지가 설치되어 있어야 합니다.
-- **OpenCV.js**: 앱 시작 시 `https://docs.opencv.org/4.5.2/opencv.js`에서 스크립트를 비동기로 로드합니다. 네트워크 연결이 필요하며, 로드 실패 시 실시간 자동 정렬 기능이 제한될 수 있습니다.
+- **OpenCV.js**: 앱 시작 시 `https://cdn.jsdelivr.net/npm/@techstark/opencv-js@4.5.2-build.2/dist/opencv.js`에서 스크립트를 비동기로 로드합니다. 네트워크 연결이 필요하며, 로드 실패 시 실시간 자동 정렬 기능이 제한될 수 있습니다.
 
 ## 🧪 테스트 (Testing)
 
