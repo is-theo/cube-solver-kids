@@ -163,8 +163,9 @@ export default function App() {
                 // UI를 먼저 'capturing' 페이즈로 전환하여 사용자에게 즉각적인 피드백을 제공합니다.
                 setPhase('capturing');
                 
-                // 솔버(cubejs) 예열: 무거운 테이블 생성 연산(~5초)이 UI 스레드를 차단하지 않도록 
-                // 전환 애니메이션/렌더링 이후로 실행을 약간 지연시킵니다.
+                // [태블릿 최적화] 솔버(cubejs) 예열: 무거운 테이블 생성 연산(~5초)이 UI 스레드를 차단하여
+                // 화면 전환 애니메이션이 멈추는 현상을 방지하기 위해 500ms 지연 실행합니다.
+                // 이 지연 시간 동안 카메라도 함께 초기화될 시간을 벌 수 있습니다.
                 setTimeout(() => {
                   initSolver().catch((err) => {
                     console.error('Failed to initialize solver:', err);

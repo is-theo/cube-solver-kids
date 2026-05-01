@@ -102,30 +102,38 @@ describe('Tablet Compatibility Support', () => {
     });
   });
 
-  describe('CameraCapture Lifecycle (Simulated)', () => {
-    it('should wait for video dimensions to be greater than 0', () => {
-      // This test simulates the logic in CameraCapture.tsx's useEffect
-      const mockVideo = {
-        videoWidth: 0,
-        videoHeight: 0,
-      };
+  describe('CameraCapture Lifecycle (Regression: Tablet resolution reporting)', () => {
+    it('should correctly handle the transition from 0 to actual resolution', () => {
+      // 1. 초기 상태: 태블릿 브라우저가 아직 비디오 해상도를 0으로 보고함
+      const initialVideo = { videoWidth: 0, videoHeight: 0 };
+      const currentCorners: [{x:number, y:number}, {x:number, y:number}, {x:number, y:number}, {x:number, y:number}] = [
+        { x: 100, y: 100 }, { x: 300, y: 100 }, { x: 300, y: 300 }, { x: 100, y: 300 }
+      ];
 
-      const checkSize = (video: typeof mockVideo) => {
-        if (video.videoWidth > 0 && video.videoHeight > 0) {
-          return calculateInitialCorners(video.videoWidth, video.videoHeight);
+      // CameraCapture.tsx의 useEffect 로직 시뮬레이션
+      const checkAndInitialize = (vw: number, vh: number, oldW: number, oldH: number) => {
+        if (vw > 0 && vh > 0) {
+          return adjustCornersForResolution(currentCorners, oldW, oldH, vw, vh);
         }
-        return null;
+        return null; // 아직 해상도가 확보되지 않음
       };
 
-      // Initial check
-      expect(checkSize(mockVideo)).toBeNull();
+      // 첫 번째 체크: 여전히 0임 -> 초기화 미루기
+      expect(checkAndInitialize(initialVideo.videoWidth, initialVideo.videoHeight, 0, 0)).toBeNull();
 
-      // After dimensions are set
-      mockVideo.videoWidth = 1280;
-      mockVideo.videoHeight = 720;
-      const result = checkSize(mockVideo);
-      expect(result).not.toBeNull();
-      expect(result![0]).toEqual({ x: 442, y: 162 });
+      // 두 번째 체크: 드디어 해상도가 잡힘 (1280x720)
+      const actualVideo = { videoWidth: 1280, videoHeight: 720 };
+      const initializedCorners = checkAndInitialize(actualVideo.videoWidth, actualVideo.videoHeight, 0, 0);
+
+      expect(initializedCorners).not.toBeNull();
+      // oldW=0 일 때 adjustCornersForResolution은 calculateInitialCorners를 호출해야 함 (중앙 정렬)
+      expect(initializedCorners![0].x).toBeGreaterThan(0);
+      expect(initializedCorners![0].y).toBeGreaterThan(0);
+      
+      // 구체적인 중앙값 검증 (calculateInitialCorners 로직)
+      // size = 720 * 0.55 = 396
+      // ox = (1280 - 396) / 2 = 442
+      expect(initializedCorners![0]).toEqual({ x: 442, y: 162 });
     });
   });
 });
