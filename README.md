@@ -44,19 +44,14 @@ npm test
 ```
 
 ### 테스트 범위 (Scope)
-*   **자동 테스트 (Vitest)**: 핵심 알고리즘 및 데이터 변환 로직 (44개 단위 테스트 포함).
-    *   **OpenCV 유틸리티**: 캔버스 이미지로부터 큐브 윤곽(4개 점) 추출 로직 검증 (`src/lib/opencvUtils.test.ts`)
-    *   **색상 인식**: RGB ↔ Lab 변환 정확도 및 Delta E 2000 공식 검증
-    *   **카메라 제약 조건**: 브라우저/기기별 Facing Mode 대응 로직
-    *   **태블릿 호환성**: 보안 컨텍스트 체크 및 제약 조건 예외 처리 회귀 테스트 (`src/lib/tabletSupport.test.ts`)
-    *   **큐브 상태**: Facelet 유효성 검사 및 솔버 연동 데이터 정규화
-*   **수동 검증 항목 (Manual Verification)**: 하드웨어 및 브라우저 API 의존적 기능 (실제 기기 테스트 권장).
-    *   **MediaPipe 연동**: 손 추적 핸들러 연동 및 실시간 프레임 처리 안정성.
-    *   **카메라 전환**: 전면/후면 카메라 토글 및 스트림 재시작.
-    *   **카메라 잠금**: 실제 환경에서의 노출/화이트밸런스 고정 동작.
-    *   **UI 반응성**: 저사양 기기에서의 3D 렌더링 및 카메라 오버레이 지연 시간.
+*   **자동 테스트 (Vitest)**: 핵심 알고리즘, 데이터 변환 로직, 카메라 제약 조건 대응 및 태블릿 호환성 등을 검증합니다.
+*   **권장 수동 검증 항목**: 하드웨어 및 브라우저 API 의존성이 높은 기능은 실제 기기에서 확인하는 것을 권장합니다.
+    - MediaPipe 연동 및 실시간 프레임 처리 안정성
+    - 전면/후면 카메라 토글 및 스트림 재시작
+    - 카메라 노출/화이트밸런스 고정 동작
+    - 저사양 기기에서의 UI 반응성
 
-> 💡 **참고**: 카메라 하드웨어 제어 루프는 브라우저 환경 및 실제 장치 의존성이 높아, 자동화된 단위 테스트 외에 [카메라 가이드](./docs/CAMERA_GUIDE.md) 및 [문제 해결 가이드](./docs/TROUBLESHOOTING.md)의 절차에 따른 수동 검증이 필요합니다.
+> 💡 **참고**: 카메라 하드웨어 제어는 기기별 특성이 강하므로 [카메라 가이드](./docs/CAMERA_GUIDE.md) 및 [문제 해결 가이드](./docs/TROUBLESHOOTING.md)를 참고하여 실제 기기에서 최종 검증하시기 바랍니다.
 
 ## 🎮 사용법
 
@@ -73,29 +68,12 @@ npm test
 
 ```
 src/
-├── components/
-│   ├── CameraCapture.tsx    # 카메라 + 9칸 그리드 + 자동 정렬/캡처 루프
-│   ├── CubeViewer3D.tsx     # Three.js 3D 큐브 + 화살표 시각화
-│   ├── FaceReview.tsx       # 6면 색상 최종 확인 및 수동 수정
-│   └── SolverGuide.tsx      # 단계별 풀이 가이드
-├── hooks/
-│   ├── useCamera.ts         # WebRTC 카메라 제어 (노출/화이트밸런스 고정)
-│   └── useMediaPipeHands.ts  # MediaPipe Hands 모델 로드 및 프레임 처리
-├── lib/
-│   ├── opencvUtils.ts       # OpenCV.js 기반 큐브 윤곽/격자 검출
-│   ├── opencvUtils.test.ts  # OpenCV 유틸리티 단위 테스트
-│   ├── colorDetector.ts     # RGB → Lab → 6색 분류 및 캘리브레이션
-│   ├── colorDetector.test.ts # 색 인식 알고리즘 테스트
-│   ├── colorSpace.ts        # sRGB-Lab 변환 및 DeltaE 2000 공식
-│   ├── colorSpace.test.ts   # 색공간 변환 정확도 검증
-│   ├── cubeState.ts         # 큐브 상태 관리 및 cubejs 솔버 연동
-│   ├── cubeState.test.ts    # 상태 유효성 및 솔버 로직 테스트
-│   └── tabletSupport.test.ts # 태블릿/모바일 호환성 회귀 테스트
-├── styles/
-│   └── global.css
-├── types/
-│   └── cubejs.d.ts          # 라이브러리 타입 정의
-├── App.tsx                  # 전역 상태 및 라우팅 (State Machine)
+├── components/          # React 컴포넌트 (카메라, 3D 뷰어, 결과 리뷰 등)
+├── hooks/               # 커스텀 훅 (카메라 제어, MediaPipe 연동)
+├── lib/                 # 핵심 비즈니스 로직 및 유틸리티 (OpenCV, 색 인식, 솔버 연동)
+├── styles/              # 글로벌 스타일
+├── types/               # TypeScript 타입 정의
+├── App.tsx              # 전역 상태 및 메인 엔트리
 └── main.tsx
 ```
 

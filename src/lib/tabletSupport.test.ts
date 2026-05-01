@@ -65,7 +65,7 @@ describe('Tablet Compatibility Support', () => {
       const vw = 1280;
       const vh = 720;
       const corners = calculateInitialCorners(vw, vh);
-      
+
       expect(corners).toHaveLength(4);
       // Center of 1280x720 is (640, 360)
       // Size is 720 * 0.55 = 396
@@ -82,10 +82,10 @@ describe('Tablet Compatibility Support', () => {
         { x: 200, y: 200 },
         { x: 100, y: 200 },
       ];
-      
+
       // Double the resolution
       const adjusted = adjustCornersForResolution(initialCorners, 400, 400, 800, 800);
-      
+
       expect(adjusted[0].x).toBeCloseTo(200);
       expect(adjusted[0].y).toBeCloseTo(200);
       expect(adjusted[2].x).toBeCloseTo(400);
