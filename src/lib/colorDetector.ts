@@ -161,6 +161,61 @@ export function classifyColor(
   return classifyColorWithConfidence(r, g, b, calibration).color;
 }
 
+/**
+ * 전역 최적화 분류 (Global Greedy Assignment).
+ * 54개의 모든 칸이 수집되었을 때, 각 색상이 정확히 9개씩 할당되도록 최적화합니다.
+ * 
+ * @param allLabs 54개 칸의 Lab 값 배열 (U1..U9, R1..R9, F1..F9, D1..D9, L1..L9, B1..B9 순서)
+ * @param calibration 캘리브레이션 데이터
+ * @returns 최적화된 54개의 CubeColor 배열
+ */
+export function solveColorAssignment(
+  allLabs: Lab[],
+  calibration?: CalibrationData,
+): CubeColor[] {
+  const references: Record<CubeColor, Lab> = {
+    ...DEFAULT_REFERENCES,
+    ...(calibration?.references || {}),
+  };
+  const colorKeys = Object.keys(references) as CubeColor[];
+  
+  // 1. 모든 칸(54)과 모든 참조색(6) 사이의 모든 거리 계산
+  interface DistanceNode {
+    stickerIdx: number;
+    color: CubeColor;
+    dist: number;
+  }
+  const distances: DistanceNode[] = [];
+  for (let i = 0; i < allLabs.length; i++) {
+    for (const color of colorKeys) {
+      distances.push({
+        stickerIdx: i,
+        color,
+        dist: deltaE(allLabs[i], references[color]),
+      });
+    }
+  }
+
+  // 2. 거리가 짧은 순서대로 정렬 (Greedy)
+  distances.sort((a, b) => a.dist - b.dist);
+
+  // 3. 각 색상별 9개 제한을 지키며 할당
+  const result = new Array<CubeColor | null>(allLabs.length).fill(null);
+  const counts: Record<CubeColor, number> = { U: 0, R: 0, F: 0, D: 0, L: 0, B: 0 };
+  let assignedCount = 0;
+
+  for (const node of distances) {
+    if (assignedCount === allLabs.length) break;
+    if (result[node.stickerIdx] === null && counts[node.color] < 9) {
+      result[node.stickerIdx] = node.color;
+      counts[node.color]++;
+      assignedCount++;
+    }
+  }
+
+  return result as CubeColor[];
+}
+
 export interface Point {
   x: number;
   y: number;

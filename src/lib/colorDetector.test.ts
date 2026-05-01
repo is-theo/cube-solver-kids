@@ -7,9 +7,11 @@ import {
   saveCalibration,
   loadCalibration,
   extract9Cells,
+  solveColorAssignment,
   type CalibrationData,
   type Point,
 } from './colorDetector';
+import type { Lab } from './colorSpace';
 
 describe('colorDetector', () => {
   beforeEach(() => {
@@ -96,6 +98,41 @@ describe('colorDetector', () => {
       // Orange: { L: 67, a: 51, b: 82 }
       const result = classifyColorWithConfidence(255, 100, 40); 
       expect(result.confidence).toBeLessThan(0.6);
+    });
+  });
+
+  describe('solveColorAssignment', () => {
+    it('should assign exactly 9 stickers for each color even with ambiguous input', () => {
+      // Create 54 stickers: 10 "almost red", 8 "almost orange", and 36 others perfectly
+      const labs: Lab[] = [];
+      
+      // 10 "almost red" (will try to compete for Red)
+      for (let i = 0; i < 10; i++) labs.push({ L: 50, a: 70, b: 60 });
+      // 8 "almost orange"
+      for (let i = 0; i < 8; i++) labs.push({ L: 65, a: 50, b: 80 });
+      
+      // 9 Green
+      for (let i = 0; i < 9; i++) labs.push({ L: 88, a: -79, b: 81 });
+      // 9 Yellow
+      for (let i = 0; i < 9; i++) labs.push({ L: 97, a: -12, b: 95 });
+      // 9 Blue
+      for (let i = 0; i < 9; i++) labs.push({ L: 45, a: -15, b: -55 });
+      // 9 White
+      for (let i = 0; i < 9; i++) labs.push({ L: 95, a: 0, b: 0 });
+
+      const result = solveColorAssignment(labs);
+      
+      const counts: Record<string, number> = {};
+      result.forEach(c => {
+        counts[c] = (counts[c] || 0) + 1;
+      });
+      
+      expect(counts['R']).toBe(9);
+      expect(counts['L']).toBe(9);
+      expect(counts['F']).toBe(9);
+      expect(counts['D']).toBe(9);
+      expect(counts['B']).toBe(9);
+      expect(counts['U']).toBe(9);
     });
   });
 
