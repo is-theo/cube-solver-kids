@@ -61,36 +61,51 @@ export function CameraCapture({ targetFace, instructionText, onCaptured, onSkip 
 
   // 초기 그리드 설정 및 해상도 변경 대응
   useEffect(() => {
-    if (ready && videoRef.current) {
-      const vw = videoRef.current.videoWidth;
-      const vh = videoRef.current.videoHeight;
-      
-      // 해상도가 바뀌었거나 아직 설정되지 않은 경우
-      if (vw !== videoSizeRef.current.w || vh !== videoSizeRef.current.h) {
-        const oldW = videoSizeRef.current.w;
-        const oldH = videoSizeRef.current.h;
-        videoSizeRef.current = { w: vw, h: vh };
+    if (!ready || !videoRef.current) return;
 
-        if (oldW === 0) {
-          // 최초 로드 시 중앙에 그리드 배치
-          const size = Math.min(vw, vh) * 0.55;
-          const ox = (vw - size) / 2;
-          const oy = (vh - size) / 2;
-          setCorners([
-            { x: ox, y: oy },
-            { x: ox + size, y: oy },
-            { x: ox + size, y: oy + size },
-            { x: ox, y: oy + size },
-          ]);
-        } else {
-          // 해상도 변경 시 기존 코너 좌표 비율에 맞춰 조정
-          setCorners(prev => prev.map(p => ({
-            x: (p.x / oldW) * vw,
-            y: (p.y / oldH) * vh
-          })) as [Point, Point, Point, Point]);
+    let rafId: number;
+    const checkSize = () => {
+      const video = videoRef.current;
+      if (!video) return;
+
+      const vw = video.videoWidth;
+      const vh = video.videoHeight;
+
+      if (vw > 0 && vh > 0) {
+        // 해상도가 바뀌었거나 아직 설정되지 않은 경우
+        if (vw !== videoSizeRef.current.w || vh !== videoSizeRef.current.h) {
+          const oldW = videoSizeRef.current.w;
+          const oldH = videoSizeRef.current.h;
+          videoSizeRef.current = { w: vw, h: vh };
+
+          if (oldW === 0) {
+            // 최초 로드 시 중앙에 그리드 배치
+            const size = Math.min(vw, vh) * 0.55;
+            const ox = (vw - size) / 2;
+            const oy = (vh - size) / 2;
+            setCorners([
+              { x: ox, y: oy },
+              { x: ox + size, y: oy },
+              { x: ox + size, y: oy + size },
+              { x: ox, y: oy + size },
+            ]);
+          } else {
+            // 해상도 변경 시 기존 코너 좌표 비율에 맞춰 조정
+            setCorners(prev => prev.map(p => ({
+              x: (p.x / oldW) * vw,
+              y: (p.y / oldH) * vh
+            })) as [Point, Point, Point, Point]);
+          }
         }
+      } else {
+        rafId = requestAnimationFrame(checkSize);
       }
-    }
+    };
+
+    checkSize();
+    return () => {
+      if (rafId) cancelAnimationFrame(rafId);
+    };
   }, [ready]);
 
   useEffect(() => {

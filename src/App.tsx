@@ -160,9 +160,12 @@ export default function App() {
             <button
               className="btn-primary btn-large"
               onClick={() => {
-                // 솔버 예열: cubejs 테이블 생성에 ~5초 소요. 캡처 중 백그라운드에서 진행하면 마지막 대기가 사라진다.
-                initSolver().catch(() => {});
                 setPhase('capturing');
+                // 솔버 예열: cubejs 테이블 생성에 ~5초 소요.
+                // 저사양 기기(태블릿 등)에서 UI 전환이 먼저 일어나도록 지연 실행.
+                setTimeout(() => {
+                  initSolver().catch(() => {});
+                }, 500);
               }}
             >
               시작하기 🚀
