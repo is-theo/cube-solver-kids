@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useCamera } from '../hooks/useCamera';
+import { useMediaPipeHands } from '../hooks/useMediaPipeHands';
+import { detectCubeOutline, isOpenCVReady } from '../lib/opencvUtils';
 import {
   extract9Cells,
   COLOR_HEX,
@@ -18,13 +20,17 @@ interface CameraCaptureProps {
 
 const LIVE_PREVIEW_THROTTLE_MS = 100;
 const STABLE_FRAMES_TO_TRIGGER = 8;
+const AUTO_ALIGN_THROTTLE_MS = 200;
 
 type LivePreviewCell = { color: CubeColor; rgb: [number, number, number]; lab: Lab };
 
 export function CameraCapture({ targetFace, instructionText, onCaptured, onSkip }: CameraCaptureProps) {
   const { videoRef, ready, error, retry, lockCamera, unlockCamera, facingMode, toggleFacingMode } = useCamera();
+  const { ready: handsReady, processFrame } = useMediaPipeHands();
+  
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
+  const cvCanvasRef = useRef<HTMLCanvasElement>(null);
 
   const [livePreview, setLivePreview] = useState<LivePreviewCell[] | null>(null);
   const [stable, setStable] = useState(false);
@@ -32,6 +38,7 @@ export function CameraCapture({ targetFace, instructionText, onCaptured, onSkip 
   const [countdown, setCountdown] = useState<number | null>(null);
   const [captured, setCaptured] = useState(false);
   const [debug, setDebug] = useState(false);
+  const [autoAlign, setAutoAlign] = useState(true);
   const [calibration, setCalibration] = useState<CalibrationData | null>(() => loadCalibration());
   const [isCalibrating, setIsCalibrating] = useState(false);
   const [calibStep, setCalibStep] = useState<CubeColor | null>(null);
@@ -47,6 +54,7 @@ export function CameraCapture({ targetFace, instructionText, onCaptured, onSkip 
   const stableFramesRef = useRef(0);
   const lastColorsRef = useRef<string>('');
   const lastPreviewPushRef = useRef<number>(0);
+  const lastAutoAlignRef = useRef<number>(0);
   const rafRef = useRef<number>(0);
   const calibRafRef = useRef<number>(0);
   const videoSizeRef = useRef({ w: 0, h: 0 });
@@ -125,12 +133,14 @@ export function CameraCapture({ targetFace, instructionText, onCaptured, onSkip 
     if (!ready || captured || isCalibrating) return;
     let stopped = false;
 
-    const tick = () => {
+    const tick = async () => {
       if (stopped) return;
       const video = videoRef.current;
       const canvas = canvasRef.current;
       const overlay = overlayCanvasRef.current;
-      if (!video || !canvas || !overlay || video.videoWidth === 0) {
+      const cvCanvas = cvCanvasRef.current;
+      
+      if (!video || !canvas || !overlay || !cvCanvas || video.videoWidth === 0) {
         rafRef.current = requestAnimationFrame(tick);
         return;
       }
@@ -142,6 +152,8 @@ export function CameraCapture({ targetFace, instructionText, onCaptured, onSkip 
         canvas.height = vh;
         overlay.width = vw;
         overlay.height = vh;
+        cvCanvas.width = vw;
+        cvCanvas.height = vh;
       }
 
       const ctx = canvas.getContext('2d', { willReadFrequently: true });
@@ -152,6 +164,27 @@ export function CameraCapture({ targetFace, instructionText, onCaptured, onSkip 
       }
 
       ctx.drawImage(video, 0, 0, vw, vh);
+
+      // MediaPipe + OpenCV 실시간 윤곽 검출 (자동 정렬 활성화 시)
+      const now = performance.now();
+      if (autoAlign && handsReady && isOpenCVReady() && now - lastAutoAlignRef.current > AUTO_ALIGN_THROTTLE_MS) {
+        lastAutoAlignRef.current = now;
+        
+        await processFrame(video, (results) => {
+          if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+            // 손이 감지됨 -> OpenCV로 큐브 윤곽 찾기
+            const cvCtx = cvCanvas.getContext('2d');
+            if (cvCtx) {
+              cvCtx.drawImage(video, 0, 0, vw, vh);
+              const detectedCorners = detectCubeOutline(cvCanvas);
+              if (detectedCorners) {
+                // 부드러운 전환을 위해 가중치 적용 가능하지만 일단 바로 설정
+                setCorners(detectedCorners);
+              }
+            }
+          }
+        });
+      }
 
       const cells = extract9Cells(ctx, corners, calibration || undefined);
 
@@ -167,7 +200,6 @@ export function CameraCapture({ targetFace, instructionText, onCaptured, onSkip 
       setStable((prev) => (prev !== isStable ? isStable : prev));
       setStableCount(stableFramesRef.current);
 
-      const now = performance.now();
       if (now - lastPreviewPushRef.current >= LIVE_PREVIEW_THROTTLE_MS) {
         lastPreviewPushRef.current = now;
         setLivePreview(cells);
@@ -211,7 +243,7 @@ export function CameraCapture({ targetFace, instructionText, onCaptured, onSkip 
       stopped = true;
       cancelAnimationFrame(rafRef.current);
     };
-  }, [ready, captured, corners, calibration, isCalibrating]);
+  }, [ready, captured, corners, calibration, isCalibrating, autoAlign, handsReady]);
 
   // Calibration loop (dedicated)
   useEffect(() => {
@@ -335,6 +367,7 @@ export function CameraCapture({ targetFace, instructionText, onCaptured, onSkip 
       <div className="video-stage">
         <video ref={videoRef} playsInline muted />
         <canvas ref={canvasRef} style={{ display: 'none' }} />
+        <canvas ref={cvCanvasRef} style={{ display: 'none' }} />
         <canvas ref={overlayCanvasRef} className="overlay-canvas" />
 
         {!isCalibrating && videoSizeRef.current.w > 0 && corners.map((p, i) => (
@@ -346,6 +379,7 @@ export function CameraCapture({ targetFace, instructionText, onCaptured, onSkip 
               top: `${(p.y / videoSizeRef.current.h) * 100}%`,
             }}
             onMouseDown={() => {
+              setAutoAlign(false); // 손으로 움직이면 자동 정렬 끄기
               const move = (me: MouseEvent) => handleCornerMove(i, me);
               const up = () => {
                 window.removeEventListener('mousemove', move);
@@ -354,7 +388,10 @@ export function CameraCapture({ targetFace, instructionText, onCaptured, onSkip 
               window.addEventListener('mousemove', move);
               window.addEventListener('mouseup', up);
             }}
-            onTouchMove={(e) => handleCornerMove(i, e)}
+            onTouchMove={(e) => {
+              setAutoAlign(false);
+              handleCornerMove(i, e);
+            }}
           />
         ))}
 
@@ -366,6 +403,8 @@ export function CameraCapture({ targetFace, instructionText, onCaptured, onSkip 
               </div>
             ))}
             <div>Stable: {stable ? 'Y' : 'N'} ({stableFramesRef.current})</div>
+            <div>OpenCV: {isOpenCVReady() ? 'Ready' : 'Wait'}</div>
+            <div>Hands: {handsReady ? 'Ready' : 'Wait'}</div>
           </div>
         )}
 
@@ -392,6 +431,9 @@ export function CameraCapture({ targetFace, instructionText, onCaptured, onSkip 
       <div className="camera-controls">
         <button className="btn-tiny" onClick={toggleFacingMode}>
           {facingMode === 'environment' ? '전면 카메라로' : '후면 카메라로'}
+        </button>
+        <button className="btn-tiny" onClick={() => setAutoAlign(!autoAlign)}>
+          자동 정렬 {autoAlign ? '끄기' : '켜기'}
         </button>
         <button className="btn-tiny" onClick={() => setDebug(!debug)}>디버그 {debug ? '끄기' : '켜기'}</button>
         <button className="btn-tiny" onClick={startCalibration} disabled={isCalibrating}>캘리브레이션</button>
