@@ -215,6 +215,50 @@ describe('colorDetector', () => {
     });
   });
 
+  describe('solveColorAssignment', () => {
+    const defaultLab: Lab = { L: 50, a: 0, b: 0 };
+    const labs54: Lab[] = Array(54).fill(defaultLab);
+
+    it('should assign exactly 9 stickers for each color', () => {
+      // 54 stickers with the same Lab value
+      const result = solveColorAssignment(labs54);
+      const counts: Record<string, number> = {};
+      result.forEach(c => counts[c] = (counts[c] || 0) + 1);
+      
+      expect(Object.keys(counts)).toHaveLength(6);
+      ['U', 'R', 'F', 'D', 'L', 'B'].forEach(color => {
+        expect(counts[color]).toBe(9);
+      });
+    });
+
+    it('should respect center stickers', () => {
+      const result = solveColorAssignment(labs54);
+      // centerIndices = [4, 13, 22, 31, 40, 49] -> [U, R, F, D, L, B]
+      expect(result[4]).toBe('U');
+      expect(result[13]).toBe('R');
+      expect(result[22]).toBe('F');
+      expect(result[31]).toBe('D');
+      expect(result[40]).toBe('L');
+      expect(result[49]).toBe('B');
+    });
+
+    it('should use calibration data if provided', () => {
+      // Create a scenario where one color is very close to a calibrated reference
+      const customLabs = [...labs54];
+      // Index 0 is very close to a custom reference for 'U'
+      customLabs[0] = { L: 90, a: 10, b: 10 };
+      
+      const calibration: CalibrationData = {
+        references: {
+          U: { L: 89, a: 11, b: 9 }
+        }
+      };
+      
+      const result = solveColorAssignment(customLabs, calibration);
+      expect(result[0]).toBe('U');
+    });
+  });
+
   describe('storage and error handling', () => {
     it('should save and load calibration data', () => {
       const data: CalibrationData = {
