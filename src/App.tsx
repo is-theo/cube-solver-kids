@@ -160,17 +160,28 @@ export default function App() {
             <button
               className="btn-primary btn-large"
               onClick={() => {
-                // UI를 먼저 'capturing' 페이즈로 전환하여 사용자에게 즉각적인 피드백을 제공합니다.
-                setPhase('capturing');
-                
-                // [태블릿 최적화] 솔버(cubejs) 예열: 무거운 테이블 생성 연산(~5초)이 UI 스레드를 차단하여
-                // 화면 전환 애니메이션이 멈추는 현상을 방지하기 위해 500ms 지연 실행합니다.
-                // 이 지연 시간 동안 카메라도 함께 초기화될 시간을 벌 수 있습니다.
-                setTimeout(() => {
-                  initSolver().catch((err) => {
-                    console.error('Failed to initialize solver:', err);
-                  });
-                }, 500);
+                try {
+                  // UI를 먼저 'capturing' 페이즈로 전환하여 사용자에게 즉각적인 피드백을 제공합니다.
+                  setPhase('capturing');
+                  
+                  // [태블릿 최적화] 솔버(cubejs) 예열: 무거운 테이블 생성 연산(~5초)이 UI 스레드를 차단하여
+                  // 화면 전환 애니메이션이 멈추는 현상을 방지하기 위해 지연 실행합니다.
+                  // 기존 500ms에서 2000ms로 늘려 카메라도 함께 초기화될 충분한 시간을 벌어줍니다.
+                  const initTask = () => {
+                    initSolver().catch((err) => {
+                      console.error('Failed to initialize solver:', err);
+                    });
+                  };
+
+                  if ('requestIdleCallback' in window) {
+                    (window as any).requestIdleCallback(() => setTimeout(initTask, 1500));
+                  } else {
+                    setTimeout(initTask, 2000);
+                  }
+                } catch (err) {
+                  console.error('Error starting capture phase:', err);
+                  alert('카메라 화면을 불러오는 중 오류가 발생했습니다.');
+                }
               }}
             >
               시작하기 🚀

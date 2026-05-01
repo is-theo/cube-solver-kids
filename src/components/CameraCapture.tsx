@@ -169,23 +169,38 @@ export function CameraCapture({ targetFace, instructionText, onCaptured, onSkip 
       if (autoAlign && handsReady && isOpenCVReady() && now - lastAutoAlignRef.current > AUTO_ALIGN_THROTTLE_MS) {
         lastAutoAlignRef.current = now;
         
-        await processFrame(video, (results) => {
-          if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-            // 손이 감지됨 -> OpenCV로 큐브 윤곽 찾기
-            const cvCtx = cvCanvas.getContext('2d');
-            if (cvCtx) {
-              cvCtx.drawImage(video, 0, 0, vw, vh);
-              const detectedCorners = detectCubeOutline(cvCanvas);
-              if (detectedCorners) {
-                // 부드러운 전환을 위해 가중치 적용 가능하지만 일단 바로 설정
-                setCorners(detectedCorners);
+        try {
+          await processFrame(video, (results) => {
+            if (results && results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+              // 손이 감지됨 -> OpenCV로 큐브 윤곽 찾기
+              const cvCtx = cvCanvas.getContext('2d');
+              if (cvCtx) {
+                try {
+                  cvCtx.drawImage(video, 0, 0, vw, vh);
+                  const detectedCorners = detectCubeOutline(cvCanvas);
+                  if (detectedCorners) {
+                    // 부드러운 전환을 위해 가중치 적용 가능하지만 일단 바로 설정
+                    setCorners(detectedCorners);
+                  }
+                } catch (cvErr) {
+                  console.warn('OpenCV processing error:', cvErr);
+                }
               }
             }
-          }
-        });
+          });
+        } catch (mpErr) {
+          console.error('MediaPipe processing error:', mpErr);
+        }
       }
 
-      const cells = extract9Cells(ctx, corners, calibration || undefined);
+      let cells: any[] = [];
+      try {
+        cells = extract9Cells(ctx, corners, calibration || undefined);
+      } catch (extErr) {
+        console.error('Cell extraction error:', extErr);
+        rafRef.current = requestAnimationFrame(tick);
+        return;
+      }
 
       // 안정성 체크
       const colorsKey = cells.map((c) => c.color).join('');
