@@ -25,10 +25,15 @@ export function useMediaPipeHands() {
       }
     });
 
-    hands.initialize().then(() => {
-      handsRef.current = hands;
-      setReady(true);
-    });
+    hands.initialize()
+      .then(() => {
+        handsRef.current = hands;
+        setReady(true);
+      })
+      .catch((err) => {
+        console.error('Failed to initialize MediaPipe Hands:', err);
+        // Even if hands fail, we want to allow manual capture/skip
+      });
 
     return () => {
       hands.close();

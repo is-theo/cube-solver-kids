@@ -26,6 +26,17 @@ export function useCamera(): UseCameraResult {
     async function start() {
       setError(null);
       setReady(false);
+
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        const isSecure = window.isSecureContext;
+        setError(
+          !isSecure 
+            ? '보안 연결(HTTPS)이 필요해요! 주소창 확인 부탁드려요 🔒'
+            : '이 브라우저는 카메라를 지원하지 않아요 😢'
+        );
+        return;
+      }
+
       try {
         const constraints = getCameraConstraints(facingMode);
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
