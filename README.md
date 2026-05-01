@@ -41,7 +41,7 @@ npm test
 
 ### 테스트 범위 (Scope)
 *   **핵심 알고리즘**: RGB → Lab 변환, 델타 E 기반 색상 분류 (대표 샘플링 테스트), 큐브 상태 검증 및 Facelet 변환.
-*   **브라우저 로직**: `extract9Cells` (Canvas 렌더링 결과 기반 좌표 추출)는 Mocking된 Canvas Context를 사용하여 기하학적 보간 로직의 정확성을 검증합니다.
+*   **브라우저 로직**: `extract9Cells` (Canvas 렌더링 결과 기반 좌표 추출)는 Mocking된 Canvas Context를 사용하여 기하학적 보간 로직의 정확성을 검증합니다. (src/lib/colorDetector.test.ts에 구현됨)
 *   **제외 범위**: 실제 카메라 하드웨어 제어 루프 및 Three.js WebGL 렌더링 가시성 테스트는 수동 검증 대상입니다.
 
 > ⚠️ **카메라는 HTTPS 또는 localhost에서만 동작**합니다.
