@@ -1,5 +1,5 @@
 import type CubeJs from 'cubejs';
-import { COLOR_NAME_KR, type CubeColor } from './colorDetector';
+import { COLOR_NAME_KR, type CubeColor, type Lab } from './colorDetector';
 
 // 면 캡처 순서 (사용자 가이드 순서)
 export const FACE_ORDER: CubeColor[] = ['U', 'R', 'F', 'D', 'L', 'B'];
@@ -25,15 +25,19 @@ export const FACE_INSTRUCTION_KR: Record<CubeColor, string> = {
 export interface CubeState {
   // 면별 9칸 색상 (cubejs faceletString 순서: U R F D L B)
   faces: Record<CubeColor, CubeColor[] | null>;
+  // 전역 최적화 자동 보정을 위한 원본 Lab 데이터 보관
+  faceLabs: Record<CubeColor, Lab[] | null>;
 }
 
 export type CompletedCubeState = CubeState & {
   faces: Record<CubeColor, CubeColor[]>;
+  faceLabs: Record<CubeColor, Lab[]>;
 };
 
 export function createEmptyCubeState(): CubeState {
   return {
     faces: { U: null, R: null, F: null, D: null, L: null, B: null },
+    faceLabs: { U: null, R: null, F: null, D: null, L: null, B: null },
   };
 }
 
@@ -41,7 +45,7 @@ export function createEmptyCubeState(): CubeState {
  * 6면 모두 캡처되었는지
  */
 export function isComplete(state: CubeState): state is CompletedCubeState {
-  return FACE_ORDER.every((f) => state.faces[f] !== null);
+  return FACE_ORDER.every((f) => state.faces[f] !== null && state.faceLabs[f] !== null);
 }
 
 /**

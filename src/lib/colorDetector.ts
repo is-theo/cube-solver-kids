@@ -76,10 +76,10 @@ export function clearCalibration(): boolean {
 
 /**
  * Delta E (CIEDE2000) - colorSpace.ts의 deltaE2000 재사용
- * 주황(L)/빨강(R) 같은 인접 색상 구분 정확도가 deltaE76보다 높음.
+ * kL=2를 사용하여 밝기 차이(조명 변화)에 좀 더 둔감하게 반응하도록 설정합니다.
  */
 export function deltaE(lab1: Lab, lab2: Lab): number {
-  return deltaE2000(lab1, lab2);
+  return deltaE2000(lab1, lab2, 2, 1, 1);
 }
 
 // 기본 참조값 (D65 기준 큐브 스티커의 일반적인 Lab 값)
@@ -162,8 +162,10 @@ export function classifyColor(
 }
 
 /**
- * 전역 최적화 분류 (Global Greedy Assignment).
+ * 전역 제약을 고려한 탐욕적 할당 (Global Greedy Assignment).
  * 54개의 모든 칸이 수집되었을 때, 각 색상이 정확히 9개씩 할당되도록 최적화합니다.
+ * 실제 큐브의 중심 칸(각 면의 4번 인덱스)은 물리적으로 고정되어 있으므로, 
+ * 이들은 수정하지 않고 나머지 48칸에 대해 할당을 수행합니다.
  * 
  * @param allLabs 54개 칸의 Lab 값 배열 (U1..U9, R1..R9, F1..F9, D1..D9, L1..L9, B1..B9 순서)
  * @param calibration 캘리브레이션 데이터
@@ -179,7 +181,21 @@ export function solveColorAssignment(
   };
   const colorKeys = Object.keys(references) as CubeColor[];
   
-  // 1. 모든 칸(54)과 모든 참조색(6) 사이의 모든 거리 계산
+  const result = new Array<CubeColor | null>(allLabs.length).fill(null);
+  const counts: Record<CubeColor, number> = { U: 0, R: 0, F: 0, D: 0, L: 0, B: 0 };
+  let assignedCount = 0;
+
+  // 1. 센터 칸 고정 (0~53 인덱스 중 4, 13, 22, 31, 40, 49)
+  // 센터는 U, R, F, D, L, B 순서대로 배치되어 있다고 가정
+  const centerIndices = [4, 13, 22, 31, 40, 49];
+  centerIndices.forEach((stickerIdx, i) => {
+    const fixedColor = colorKeys[i];
+    result[stickerIdx] = fixedColor;
+    counts[fixedColor]++;
+    assignedCount++;
+  });
+
+  // 2. 나머지 칸들에 대해 모든 가능한 (칸, 색상) 쌍의 거리 계산
   interface DistanceNode {
     stickerIdx: number;
     color: CubeColor;
@@ -187,6 +203,9 @@ export function solveColorAssignment(
   }
   const distances: DistanceNode[] = [];
   for (let i = 0; i < allLabs.length; i++) {
+    // 센터는 이미 할당했으므로 제외
+    if (result[i] !== null) continue;
+
     for (const color of colorKeys) {
       distances.push({
         stickerIdx: i,
@@ -196,14 +215,10 @@ export function solveColorAssignment(
     }
   }
 
-  // 2. 거리가 짧은 순서대로 정렬 (Greedy)
+  // 3. 거리가 짧은 순서대로 정렬 (Greedy)
   distances.sort((a, b) => a.dist - b.dist);
 
-  // 3. 각 색상별 9개 제한을 지키며 할당
-  const result = new Array<CubeColor | null>(allLabs.length).fill(null);
-  const counts: Record<CubeColor, number> = { U: 0, R: 0, F: 0, D: 0, L: 0, B: 0 };
-  let assignedCount = 0;
-
+  // 4. 각 색상별 9개 제한을 지키며 할당
   for (const node of distances) {
     if (assignedCount === allLabs.length) break;
     if (result[node.stickerIdx] === null && counts[node.color] < 9) {

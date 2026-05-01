@@ -12,7 +12,7 @@ import type { CubeColor, Point, CalibrationData, Lab } from '../lib/colorDetecto
 interface CameraCaptureProps {
   targetFace: CubeColor;
   instructionText: string;
-  onCaptured: (colors: CubeColor[]) => void;
+  onCaptured: (colors: CubeColor[], labs: Lab[]) => void;
   onSkip?: () => void;
 }
 
@@ -240,8 +240,9 @@ export function CameraCapture({ targetFace, instructionText, onCaptured, onSkip 
       if (livePreview) {
         setCaptured(true);
         const colors = livePreview.map((c) => c.color);
+        const labs = livePreview.map((c) => c.lab);
         setTimeout(() => {
-          onCaptured(colors);
+          onCaptured(colors, labs);
           unlockCamera();
         }, 350);
       }

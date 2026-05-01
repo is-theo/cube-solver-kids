@@ -8,12 +8,13 @@ interface FaceReviewProps {
   onChange: (face: CubeColor, idx: number, newColor: CubeColor) => void;
   onConfirm: () => void;
   onRetake: (face: CubeColor) => void;
+  onMagicFix: () => void;
   validationError?: string | null;
 }
 
 const ALL_COLORS: CubeColor[] = ['U', 'R', 'F', 'D', 'L', 'B'];
 
-export function FaceReview({ faces, onChange, onConfirm, onRetake, validationError }: FaceReviewProps) {
+export function FaceReview({ faces, onChange, onConfirm, onRetake, onMagicFix, validationError }: FaceReviewProps) {
   const [editingCell, setEditingCell] = useState<{ face: CubeColor; idx: number } | null>(null);
 
   useEffect(() => {
@@ -106,9 +107,14 @@ export function FaceReview({ faces, onChange, onConfirm, onRetake, validationErr
         })}
       </div>
 
-      <button className="btn-primary btn-large" onClick={onConfirm}>
-        다 맞아! 풀어줘 🪄
-      </button>
+      <div className="review-actions">
+        <button className="btn-secondary" onClick={onMagicFix} title="색상 개수가 안 맞으면 자동으로 맞춰줘요">
+          자동 보정 (Magic Fix) ✨
+        </button>
+        <button className="btn-primary btn-large" onClick={onConfirm}>
+          다 맞아! 풀어줘 🪄
+        </button>
+      </div>
 
       {editingCell && createPortal(modal, document.body)}
     </div>

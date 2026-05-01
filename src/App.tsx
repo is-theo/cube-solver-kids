@@ -12,7 +12,7 @@ import {
   solveCube,
   type CubeState,
 } from './lib/cubeState';
-import type { CubeColor } from './lib/colorDetector';
+import { solveColorAssignment, type CubeColor, type Lab } from './lib/colorDetector';
 
 type Phase = 'intro' | 'capturing' | 'review' | 'solving' | 'solution';
 
@@ -26,10 +26,11 @@ export default function App() {
 
   const currentFace = FACE_ORDER[currentFaceIdx];
 
-  const handleCaptured = (colors: CubeColor[]) => {
+  const handleCaptured = (colors: CubeColor[], labs: Lab[]) => {
     setCubeState((prev) => ({
       ...prev,
       faces: { ...prev.faces, [currentFace]: colors },
+      faceLabs: { ...prev.faceLabs, [currentFace]: labs },
     }));
     if (currentFaceIdx < FACE_ORDER.length - 1) {
       setCurrentFaceIdx((i) => i + 1);
@@ -146,20 +147,49 @@ export default function App() {
             onSkip={() => {
               // 임시로 모두 해당 색으로 채움 (수동 입력 모드)
               const placeholder: CubeColor[] = Array(9).fill(currentFace);
-              handleCaptured(placeholder);
+              const dummyLabs: Lab[] = Array(9).fill({ L: 0, a: 0, b: 0 });
+              handleCaptured(placeholder, dummyLabs);
             }}
-          />
-        )}
+          const handleMagicFix = () => {
+            // 6면의 Lab 데이터를 하나의 배열(54개)로 합치기 (U R F D L B 순서)
+            const allLabs: Lab[] = [];
+            for (const face of FACE_ORDER) {
+              const labs = cubeState.faceLabs[face];
+              if (labs) {
+                allLabs.push(...labs);
+              } else {
+                // 데이터가 없으면 기본값(L:0, a:0, b:0)으로 채움 (보통은 다 있어야 함)
+                allLabs.push(...Array(9).fill({ L: 0, a: 0, b: 0 }));
+              }
+            }
 
-        {phase === 'review' && (
-          <FaceReview
-            faces={cubeState.faces}
-            onChange={handleEditCell}
-            onConfirm={handleConfirm}
-            onRetake={handleRetakeFace}
-            validationError={validationError || solverError}
-          />
-        )}
+            const optimized = solveColorAssignment(allLabs);
+
+            // 다시 면별로 쪼개서 상태 업데이트
+            setCubeState((prev) => {
+              const nextFaces = { ...prev.faces };
+              FACE_ORDER.forEach((face, faceIdx) => {
+                nextFaces[face] = optimized.slice(faceIdx * 9, (faceIdx + 1) * 9);
+              });
+              return { ...prev, faces: nextFaces };
+            });
+            setValidationError(null);
+          };
+
+          return (
+            <div className="app">
+          ...
+                {phase === 'review' && (
+                  <FaceReview
+                    faces={cubeState.faces}
+                    onChange={handleEditCell}
+                    onConfirm={handleConfirm}
+                    onRetake={handleRetakeFace}
+                    onMagicFix={handleMagicFix}
+                    validationError={validationError || solverError}
+                  />
+                )}
+
 
         {phase === 'solving' && (
           <div className="solving">
