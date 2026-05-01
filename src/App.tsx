@@ -160,11 +160,15 @@ export default function App() {
             <button
               className="btn-primary btn-large"
               onClick={() => {
+                // UI를 먼저 'capturing' 페이즈로 전환하여 사용자에게 즉각적인 피드백을 제공합니다.
                 setPhase('capturing');
-                // 솔버 예열: cubejs 테이블 생성에 ~5초 소요.
-                // 저사양 기기(태블릿 등)에서 UI 전환이 먼저 일어나도록 지연 실행.
+                
+                // 솔버(cubejs) 예열: 무거운 테이블 생성 연산(~5초)이 UI 스레드를 차단하지 않도록 
+                // 전환 애니메이션/렌더링 이후로 실행을 약간 지연시킵니다.
                 setTimeout(() => {
-                  initSolver().catch(() => {});
+                  initSolver().catch((err) => {
+                    console.error('Failed to initialize solver:', err);
+                  });
                 }, 500);
               }}
             >

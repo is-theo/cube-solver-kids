@@ -101,4 +101,31 @@ describe('Tablet Compatibility Support', () => {
       expect(adjusted[0]).toEqual({ x: 225, y: 225 });
     });
   });
+
+  describe('CameraCapture Lifecycle (Simulated)', () => {
+    it('should wait for video dimensions to be greater than 0', () => {
+      // This test simulates the logic in CameraCapture.tsx's useEffect
+      const mockVideo = {
+        videoWidth: 0,
+        videoHeight: 0,
+      };
+
+      const checkSize = (video: typeof mockVideo) => {
+        if (video.videoWidth > 0 && video.videoHeight > 0) {
+          return calculateInitialCorners(video.videoWidth, video.videoHeight);
+        }
+        return null;
+      };
+
+      // Initial check
+      expect(checkSize(mockVideo)).toBeNull();
+
+      // After dimensions are set
+      mockVideo.videoWidth = 1280;
+      mockVideo.videoHeight = 720;
+      const result = checkSize(mockVideo);
+      expect(result).not.toBeNull();
+      expect(result![0]).toEqual({ x: 442, y: 162 });
+    });
+  });
 });
