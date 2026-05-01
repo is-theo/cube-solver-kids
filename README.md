@@ -72,6 +72,7 @@ src/
 │   ├── colorDetector.ts     # RGB → Lab → 6색 분류 (Calibration 지원)
 │   ├── colorDetector.test.ts # 색 인식 테스트
 │   ├── colorSpace.ts        # sRGB-Lab 변환 및 DeltaE 공식
+│   ├── colorSpace.test.ts   # 색공간 및 표준 DeltaE 2000 검증 테스트
 │   ├── cubeState.ts         # 큐브 상태 + cubejs 솔버 래퍼
 │   └── cubeState.test.ts    # 상태 검증 및 솔버 테스트
 ├── styles/

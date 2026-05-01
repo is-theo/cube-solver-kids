@@ -96,6 +96,10 @@ export default function App() {
     setSolverError(null);
 
     try {
+      if (!isComplete(cubeState)) {
+        setValidationError('아직 모든 면을 다 보여주지 않았어요');
+        return;
+      }
       const facelet = toFaceletString(cubeState);
       const sol = await solveCube(facelet);
       if (sol.length === 0) {

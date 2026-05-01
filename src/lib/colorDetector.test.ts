@@ -238,15 +238,15 @@ describe('colorDetector', () => {
     });
 
     it('should handle SSR (no window)', () => {
-      const originalWindow = global.window;
+      const originalWindow = (globalThis as any).window;
       // @ts-ignore
-      delete global.window;
+      delete (globalThis as any).window;
 
       expect(loadCalibration()).toBeNull();
       // Should not throw
       saveCalibration({ references: {} });
 
-      global.window = originalWindow;
+      (globalThis as any).window = originalWindow;
     });
 
     it('should handle corrupted calibration data', () => {
