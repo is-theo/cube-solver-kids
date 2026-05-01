@@ -17,6 +17,8 @@
 ## 🛠 기술 스택
 
 - Vite + React 18 + TypeScript
+- **MediaPipe Hands**: 실시간 손 추적 및 큐브 영역 감지
+- **OpenCV.js (v4.5.2)**: Canny Edge/Contour Detection 기반 큐브 면 윤곽 추출 (CDN 로드)
 - Three.js (3D 큐브 시각화)
 - cubejs (Kociemba 알고리즘 큐브 솔버)
 - WebRTC `getUserMedia` (카메라)
@@ -29,7 +31,9 @@ npm install
 npm run dev
 ```
 
-브라우저에서 http://localhost:5173 접속.
+### 외부 의존성 (Runtime Dependencies)
+- **MediaPipe**: `@mediapipe/hands`, `@mediapipe/camera_utils` 패키지가 설치되어 있어야 합니다.
+- **OpenCV.js**: 앱 시작 시 `https://docs.opencv.org/4.5.2/opencv.js`에서 스크립트를 비동기로 로드합니다. 네트워크 연결이 필요하며, 로드 실패 시 실시간 자동 정렬 기능이 제한될 수 있습니다.
 
 ## 🧪 테스트 (Testing)
 
@@ -40,7 +44,8 @@ npm test
 ```
 
 ### 테스트 범위 (Scope)
-*   **자동 테스트 (Vitest)**: 핵심 알고리즘 및 데이터 변환 로직 (단위 테스트 32개 통과).
+*   **자동 테스트 (Vitest)**: 핵심 알고리즘 및 데이터 변환 로직 (단위 테스트 35개 통과).
+    *   **OpenCV 유틸리티**: 캔버스 이미지로부터 큐브 윤곽(4개 점) 추출 로직 검증 (`src/lib/opencvUtils.test.ts`)
     *   RGB ↔ Lab 변환 정확도
     *   Delta E 2000 색상 거리 계산
     *   **카메라 제약 조건 로직**: Facing Mode에 따른 제약 조건 생성 검증
