@@ -19,6 +19,14 @@ describe('cubeState', () => {
       L: Array(9).fill('L'),
       B: Array(9).fill('B'),
     };
+    state.faceLabs = {
+      U: Array(9).fill({ L: 0, a: 0, b: 0 }),
+      R: Array(9).fill({ L: 0, a: 0, b: 0 }),
+      F: Array(9).fill({ L: 0, a: 0, b: 0 }),
+      D: Array(9).fill({ L: 0, a: 0, b: 0 }),
+      L: Array(9).fill({ L: 0, a: 0, b: 0 }),
+      B: Array(9).fill({ L: 0, a: 0, b: 0 }),
+    };
     expect(isComplete(state)).toBe(true);
     if (isComplete(state)) {
       expect(toFaceletString(state)).toBe('UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB');
@@ -37,6 +45,14 @@ describe('cubeState', () => {
       L: Array(9).fill('L'),
       B: Array(9).fill('B'),
     };
+    state.faceLabs = {
+      U: Array(9).fill({ L: 0, a: 0, b: 0 }),
+      R: Array(9).fill({ L: 0, a: 0, b: 0 }),
+      F: Array(9).fill({ L: 0, a: 0, b: 0 }),
+      D: Array(9).fill({ L: 0, a: 0, b: 0 }),
+      L: Array(9).fill({ L: 0, a: 0, b: 0 }),
+      B: Array(9).fill({ L: 0, a: 0, b: 0 }),
+    };
     const result = validateCubeState(state);
     expect(result.valid).toBe(true);
   });
@@ -50,6 +66,14 @@ describe('cubeState', () => {
       D: Array(9).fill('D'),
       L: Array(9).fill('L'),
       B: Array(9).fill('B'),
+    };
+    state.faceLabs = {
+      U: Array(9).fill({ L: 0, a: 0, b: 0 }),
+      R: Array(9).fill({ L: 0, a: 0, b: 0 }),
+      F: Array(9).fill({ L: 0, a: 0, b: 0 }),
+      D: Array(9).fill({ L: 0, a: 0, b: 0 }),
+      L: Array(9).fill({ L: 0, a: 0, b: 0 }),
+      B: Array(9).fill({ L: 0, a: 0, b: 0 }),
     };
     // Make one U into R
     state.faces.U![0] = 'R'; 
@@ -69,6 +93,14 @@ describe('cubeState', () => {
       D: Array(9).fill('D'),
       L: Array(9).fill('L'),
       B: Array(9).fill('B'),
+    };
+    state.faceLabs = {
+      U: Array(9).fill({ L: 0, a: 0, b: 0 }),
+      R: Array(9).fill({ L: 0, a: 0, b: 0 }),
+      F: Array(9).fill({ L: 0, a: 0, b: 0 }),
+      D: Array(9).fill({ L: 0, a: 0, b: 0 }),
+      L: Array(9).fill({ L: 0, a: 0, b: 0 }),
+      B: Array(9).fill({ L: 0, a: 0, b: 0 }),
     };
     
     // Adjust one R to U to pass count check
