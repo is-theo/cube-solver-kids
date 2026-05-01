@@ -14,6 +14,40 @@ interface FaceReviewProps {
 
 const ALL_COLORS: CubeColor[] = ['U', 'R', 'F', 'D', 'L', 'B'];
 
+function FaceCard({ face, faces, onRetake, onChange, setEditingCell }: {
+  face: CubeColor;
+  faces: Record<CubeColor, CubeColor[] | null>;
+  onRetake: (face: CubeColor) => void;
+  onChange: (face: CubeColor, idx: number, newColor: CubeColor) => void;
+  setEditingCell: (cell: { face: CubeColor; idx: number } | null) => void;
+}) {
+  const cells = faces[face];
+  return (
+    <div className="face-card">
+      <div className="face-card-header">
+        <span className="face-card-title">
+          <span className="face-dot" style={{ background: COLOR_HEX[face] }} />
+          {FACE_NAME_KR[face].split(' ')[0]}
+        </span>
+        <button className="btn-tiny-icon" onClick={() => onRetake(face)} title="다시 찍기">🔄</button>
+      </div>
+      <div className="face-grid-3x3">
+        {cells &&
+          cells.map((c, i) => (
+            <button
+              key={i}
+              className={`mini-cell ${i === 4 ? 'mini-cell-center' : ''}`}
+              style={{ background: COLOR_HEX[c] }}
+              onClick={() => i !== 4 && setEditingCell({ face, idx: i })}
+              disabled={i === 4}
+              aria-label={COLOR_NAME_KR[c]}
+            />
+          ))}
+      </div>
+    </div>
+  );
+}
+
 export function FaceReview({ faces, onChange, onConfirm, onRetake, onMagicFix, validationError }: FaceReviewProps) {
   const [editingCell, setEditingCell] = useState<{ face: CubeColor; idx: number } | null>(null);
 
@@ -72,39 +106,34 @@ export function FaceReview({ faces, onChange, onConfirm, onRetake, onMagicFix, v
         <div className="validation-error">⚠️ {validationError}</div>
       )}
 
-      <div className="faces-grid">
-        {FACE_ORDER.map((face) => {
-          const cells = faces[face];
-          return (
-            <div key={face} className="face-card">
-              <div className="face-card-header">
-                <span className="face-card-title">
-                  <span
-                    className="face-dot"
-                    style={{ background: COLOR_HEX[face] }}
-                  />
-                  {FACE_NAME_KR[face]}
-                </span>
-                <button className="btn-tiny" onClick={() => onRetake(face)}>
-                  다시 찍기
-                </button>
-              </div>
-              <div className="face-grid-3x3">
-                {cells &&
-                  cells.map((c, i) => (
-                    <button
-                      key={i}
-                      className={`mini-cell ${i === 4 ? 'mini-cell-center' : ''}`}
-                      style={{ background: COLOR_HEX[c] }}
-                      onClick={() => i !== 4 && setEditingCell({ face, idx: i })}
-                      disabled={i === 4}
-                      aria-label={COLOR_NAME_KR[c]}
-                    />
-                  ))}
-              </div>
-            </div>
-          );
-        })}
+      <div className="faces-net-grid">
+        {/* Row 1: Top (U) */}
+        <div className="net-row">
+          <div className="net-empty" />
+          <FaceCard face="U" faces={faces} onRetake={onRetake} onChange={onChange} setEditingCell={setEditingCell} />
+          <div className="net-empty" />
+        </div>
+        
+        {/* Row 2: Left (L), Front (F), Right (R) */}
+        <div className="net-row">
+          <FaceCard face="L" faces={faces} onRetake={onRetake} onChange={onChange} setEditingCell={setEditingCell} />
+          <FaceCard face="F" faces={faces} onRetake={onRetake} onChange={onChange} setEditingCell={setEditingCell} />
+          <FaceCard face="R" faces={faces} onRetake={onRetake} onChange={onChange} setEditingCell={setEditingCell} />
+        </div>
+
+        {/* Row 3: Down (D) */}
+        <div className="net-row">
+          <div className="net-empty" />
+          <FaceCard face="D" faces={faces} onRetake={onRetake} onChange={onChange} setEditingCell={setEditingCell} />
+          <div className="net-empty" />
+        </div>
+
+        {/* Row 4: Back (B) */}
+        <div className="net-row">
+          <div className="net-empty" />
+          <FaceCard face="B" faces={faces} onRetake={onRetake} onChange={onChange} setEditingCell={setEditingCell} />
+          <div className="net-empty" />
+        </div>
       </div>
 
       <div className="review-actions">

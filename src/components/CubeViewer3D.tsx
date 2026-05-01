@@ -229,9 +229,9 @@ export function CubeViewer3D({ faces, highlightMove }: CubeViewer3DProps) {
 
     const transform = getFaceTransforms(faceColor);
 
-    const radius = 1.7;
-    const tube = 0.13;
-    const arc = Math.PI * 1.4;
+    const radius = 1.35; // 조금 더 작게 조정
+    const tube = 0.1;
+    const arc = Math.PI * 1.5;
     const torusGeo = new THREE.TorusGeometry(radius, tube, 12, 32, arc);
     const torusMat = new THREE.MeshStandardMaterial({
       color: 0xff3b8d,
@@ -241,14 +241,21 @@ export function CubeViewer3D({ faces, highlightMove }: CubeViewer3DProps) {
     });
     const torus = new THREE.Mesh(torusGeo, torusMat) as ArrowMesh;
 
-    const offset = 0.5;
+    const offset = 0.6;
     const facePos = new THREE.Vector3(...transform.position);
     const faceNormal = facePos.clone().normalize();
     torus.position.copy(facePos).add(faceNormal.clone().multiplyScalar(offset));
     torus.lookAt(torus.position.clone().add(faceNormal));
 
-    if (!clockwise) {
-      torus.rotation.z += Math.PI;
+    // 기본 TorusGeometry는 XY평면에서 (1,0)에서 시작해 CCW로 arc만큼 그려짐.
+    // 시계방향(clockwise)으로 보이게 하려면, torus를 뒤집거나 방향을 조정해야 함.
+    if (clockwise) {
+      // 시계방향: 뒤집어서 CCW가 CW처럼 보이게 함
+      torus.scale.x = -1;
+      torus.rotation.z += arc; 
+    } else {
+      // 반시계방향: 그대로 사용하되 시작 위치 조정 가능
+      torus.rotation.z -= arc / 2;
     }
 
     arrowGroup.add(torus);
@@ -262,15 +269,21 @@ export function CubeViewer3D({ faces, highlightMove }: CubeViewer3DProps) {
     });
     const cone = new THREE.Mesh(coneGeo, coneMat) as ArrowMesh;
 
-    const endAngle = clockwise ? arc : -arc;
-    const localEnd = new THREE.Vector3(Math.cos(endAngle) * radius, Math.sin(endAngle) * radius, 0);
-    localEnd.applyEuler(torus.rotation);
-    cone.position.copy(torus.position).add(localEnd);
+    // 콘(화살촉) 배치
+    // torus의 끝점(angle = arc)에 배치
+    const localEnd = new THREE.Vector3(Math.cos(arc) * radius, Math.sin(arc) * radius, 0);
+    localEnd.applyEuler(new THREE.Euler(0, 0, torus.rotation.z));
+    if (clockwise) localEnd.x *= -1; // scale.x = -1 반영
+    
+    cone.position.copy(torus.position).add(localEnd.applyQuaternion(torus.quaternion));
 
-    const tangent = new THREE.Vector3(-Math.sin(endAngle), Math.cos(endAngle), 0);
-    if (!clockwise) tangent.negate();
-    tangent.applyEuler(torus.rotation);
-    cone.lookAt(cone.position.clone().add(tangent));
+    // 접선 방향으로 머리 돌리기
+    const tangent = new THREE.Vector3(-Math.sin(arc), Math.cos(arc), 0);
+    tangent.applyEuler(new THREE.Euler(0, 0, torus.rotation.z));
+    if (clockwise) tangent.x *= -1;
+    
+    const worldTangent = tangent.applyQuaternion(torus.quaternion).normalize();
+    cone.lookAt(cone.position.clone().add(worldTangent));
     cone.rotateX(Math.PI / 2);
 
     arrowGroup.add(cone);

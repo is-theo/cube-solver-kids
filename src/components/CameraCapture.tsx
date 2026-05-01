@@ -17,7 +17,7 @@ interface CameraCaptureProps {
 }
 
 const LIVE_PREVIEW_THROTTLE_MS = 100;
-const STABLE_FRAMES_TO_TRIGGER = 12;
+const STABLE_FRAMES_TO_TRIGGER = 8;
 
 type LivePreviewCell = { color: CubeColor; rgb: [number, number, number]; lab: Lab };
 
@@ -28,6 +28,7 @@ export function CameraCapture({ targetFace, instructionText, onCaptured, onSkip 
 
   const [livePreview, setLivePreview] = useState<LivePreviewCell[] | null>(null);
   const [stable, setStable] = useState(false);
+  const [stableCount, setStableCount] = useState(0);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [captured, setCaptured] = useState(false);
   const [debug, setDebug] = useState(false);
@@ -164,6 +165,7 @@ export function CameraCapture({ targetFace, instructionText, onCaptured, onSkip 
       }
       const isStable = stableFramesRef.current >= STABLE_FRAMES_TO_TRIGGER;
       setStable((prev) => (prev !== isStable ? isStable : prev));
+      setStableCount(stableFramesRef.current);
 
       const now = performance.now();
       if (now - lastPreviewPushRef.current >= LIVE_PREVIEW_THROTTLE_MS) {
@@ -314,7 +316,17 @@ export function CameraCapture({ targetFace, instructionText, onCaptured, onSkip 
             {!centerOk && livePreview && (
               <span className="status-warn">중앙이 <b>{COLOR_NAME_KR[targetFace]}</b>이어야 해요!</span>
             )}
-            {centerOk && !stable && <span className="status-tip">큐브를 가만히 들어줘 ✋</span>}
+            {centerOk && !stable && (
+              <div className="stability-progress">
+                <span className="status-tip">큐브를 가만히 들어줘 ✋</span>
+                <div className="stability-bar-bg">
+                  <div 
+                    className="stability-bar-fill" 
+                    style={{ width: `${(stableCount / STABLE_FRAMES_TO_TRIGGER) * 100}%` }} 
+                  />
+                </div>
+              </div>
+            )}
             {centerOk && stable && countdown !== null && countdown > 0 && <span className="status-go">곧 찰칵! 📸</span>}
           </div>
         )}
