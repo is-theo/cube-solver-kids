@@ -126,7 +126,7 @@ export function classifyColorWithConfidence(
   let bestDistance = Infinity;
   let secondDistance = Infinity;
 
-  (Object.keys(references) as CubeColor[]).forEach((color) => {
+  FACE_COLORS.forEach((color) => {
     const dist = deltaE(currentLab, references[color]);
     if (dist < bestDistance) {
       secondDistance = bestDistance;
