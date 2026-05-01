@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { getCameraConstraints } from '../lib/cameraUtils';
 
 interface UseCameraResult {
   videoRef: React.RefObject<HTMLVideoElement>;
@@ -26,14 +27,8 @@ export function useCamera(): UseCameraResult {
       setError(null);
       setReady(false);
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: facingMode,
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
-          },
-          audio: false,
-        });
+        const constraints = getCameraConstraints(facingMode);
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
 
         if (cancelled) {
           stream.getTracks().forEach((t) => t.stop());
