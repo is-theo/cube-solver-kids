@@ -22,7 +22,7 @@ const STABLE_FRAMES_TO_TRIGGER = 12;
 type LivePreviewCell = { color: CubeColor; rgb: [number, number, number]; lab: Lab };
 
 export function CameraCapture({ targetFace, instructionText, onCaptured, onSkip }: CameraCaptureProps) {
-  const { videoRef, ready, error, retry, lockCamera, unlockCamera } = useCamera();
+  const { videoRef, ready, error, retry, lockCamera, unlockCamera, facingMode, toggleFacingMode } = useCamera();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -362,6 +362,9 @@ export function CameraCapture({ targetFace, instructionText, onCaptured, onSkip 
       </div>
 
       <div className="camera-controls">
+        <button className="btn-tiny" onClick={toggleFacingMode}>
+          {facingMode === 'environment' ? '전면 카메라로' : '후면 카메라로'}
+        </button>
         <button className="btn-tiny" onClick={() => setDebug(!debug)}>디버그 {debug ? '끄기' : '켜기'}</button>
         <button className="btn-tiny" onClick={startCalibration} disabled={isCalibrating}>캘리브레이션</button>
       </div>

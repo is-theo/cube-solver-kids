@@ -4,6 +4,8 @@ interface UseCameraResult {
   videoRef: React.RefObject<HTMLVideoElement>;
   ready: boolean;
   error: string | null;
+  facingMode: 'user' | 'environment';
+  toggleFacingMode: () => void;
   retry: () => void;
   lockCamera: () => Promise<boolean>;
   unlockCamera: () => Promise<boolean>;
@@ -13,6 +15,7 @@ export function useCamera(): UseCameraResult {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment');
   const [attempt, setAttempt] = useState(0);
   const streamRef = useRef<MediaStream | null>(null);
 
@@ -25,7 +28,7 @@ export function useCamera(): UseCameraResult {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
           video: {
-            facingMode: 'environment', // 모바일은 후면 카메라 우선
+            facingMode: facingMode,
             width: { ideal: 1280 },
             height: { ideal: 720 },
           },
@@ -35,6 +38,11 @@ export function useCamera(): UseCameraResult {
         if (cancelled) {
           stream.getTracks().forEach((t) => t.stop());
           return;
+        }
+
+        // 기존 스트림 정리
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach((t) => t.stop());
         }
 
         streamRef.current = stream;
@@ -65,7 +73,11 @@ export function useCamera(): UseCameraResult {
         streamRef.current.getTracks().forEach((t) => t.stop());
       }
     };
-  }, [attempt]);
+  }, [attempt, facingMode]);
+
+  const toggleFacingMode = () => {
+    setFacingMode((prev) => (prev === 'environment' ? 'user' : 'environment'));
+  };
 
   const setCameraLock = async (locked: boolean): Promise<boolean> => {
     if (!streamRef.current) return false;
@@ -107,6 +119,8 @@ export function useCamera(): UseCameraResult {
     videoRef,
     ready,
     error,
+    facingMode,
+    toggleFacingMode,
     retry: () => setAttempt((a) => a + 1),
     lockCamera: () => setCameraLock(true),
     unlockCamera: () => setCameraLock(false),
