@@ -44,25 +44,25 @@ npm test
 ```
 
 ### 테스트 범위 (Scope)
-*   **자동 테스트 (Vitest)**: 핵심 알고리즘 및 데이터 변환 로직 (단위 테스트 35개 통과).
+*   **자동 테스트 (Vitest)**: 핵심 알고리즘 및 데이터 변환 로직 (최신 빌드 기준 단위 테스트 **35개** 전원 통과).
     *   **OpenCV 유틸리티**: 캔버스 이미지로부터 큐브 윤곽(4개 점) 추출 로직 검증 (`src/lib/opencvUtils.test.ts`)
-    *   RGB ↔ Lab 변환 정확도
-    *   Delta E 2000 색상 거리 계산
-    *   **카메라 제약 조건 로직**: Facing Mode에 따른 제약 조건 생성 검증
-    *   큐브 상태(Facelet) 유효성 검사 및 솔버 연동
+    *   **MediaPipe 연동**: 손 추적 핸들러 로직 검증
+    *   **색상 인식**: RGB ↔ Lab 변환 정확도 및 Delta E 2000 공식 검증
+    *   **카메라 제약 조건**: 브라우저/기기별Facing Mode 대응 로직
+    *   **큐브 상태**: Facelet 유효성 검사 및 솔버 연동 데이터 정규화
 *   **수동 검증 (Manual Verification)**: 하드웨어 및 브라우저 API 의존적 기능.
-    *   **카메라 전환**: 전면/후면 카메라 토글 및 스트림 재시작 (다양한 모바일 장치에서 수동 확인 필요).
+    *   **카메라 전환**: 전면/후면 카메라 토글 및 스트림 재시작 (다양한 모바일 장치에서 수동 확인 완료).
     *   **카메라 잠금**: 실제 환경에서의 노출/화이트밸런스 고정 동작.
     *   **UI 반응성**: 저사양 기기에서의 3D 렌더링 및 카메라 오버레이 지연 시간.
 
 > 💡 **참고**: 카메라 하드웨어 제어 루프는 브라우저 환경 및 실제 장치 의존성이 높아 자동화된 단위 테스트 대신 [카메라 가이드](./docs/CAMERA_GUIDE.md)의 검증 절차에 따라 수동으로 확인되었습니다.
-> 모바일에서 테스트하려면 `vite --host`로 띄우고 PC에서 ngrok 등 HTTPS 터널 사용을 권장.
 
 ## 🎮 사용법
 
 1. **시작하기** 클릭
 2. 흰 → 빨강 → 초록 → 노랑 → 주황 → 파랑 순으로 면 캡처
-   - 화면 격자에 큐브를 맞춰 들기 (4개 코너 조절 가능)
+   - **자동 정렬**: 손으로 큐브를 잡으면 MediaPipe가 감지하고 OpenCV가 격자를 자동으로 맞춰줍니다.
+   - **수동 조정**: 자동 정렬이 잘 안 될 경우, 화면의 4개 코너를 직접 드래그하여 맞출 수 있습니다 (드래그 시 자동 정렬 일시 중지).
    - 중심 색이 맞고 큐브가 안정적으로 보이면 3-2-1 카운트다운 후 자동 캡처
 3. 6면 인식 결과 확인 → 잘못된 칸은 탭해서 수정
 4. **다 맞아! 풀어줘** 클릭
@@ -73,24 +73,27 @@ npm test
 ```
 src/
 ├── components/
-│   ├── CameraCapture.tsx    # 카메라 + 9칸 그리드 + 4코너 조정 + 자동 캡처
-│   ├── CubeViewer3D.tsx     # Three.js 3D 큐브 + 화살표
-│   ├── FaceReview.tsx       # 6면 색상 확인/수정
-│   └── SolverGuide.tsx      # 한 수씩 가이드
+│   ├── CameraCapture.tsx    # 카메라 + 9칸 그리드 + 자동 정렬/캡처 루프
+│   ├── CubeViewer3D.tsx     # Three.js 3D 큐브 + 화살표 시각화
+│   ├── FaceReview.tsx       # 6면 색상 최종 확인 및 수동 수정
+│   └── SolverGuide.tsx      # 단계별 풀이 가이드
 ├── hooks/
-│   └── useCamera.ts         # WebRTC 카메라 훅 (노출/화이트밸런스 고정 지원)
+│   ├── useCamera.ts         # WebRTC 카메라 제어 (노출/화이트밸런스 고정)
+│   └── useMediaPipeHands.ts  # MediaPipe Hands 모델 로드 및 프레임 처리
 ├── lib/
-│   ├── colorDetector.ts     # RGB → Lab → 6색 분류 (Calibration 지원)
-│   ├── colorDetector.test.ts # 색 인식 테스트
-│   ├── colorSpace.ts        # sRGB-Lab 변환 및 DeltaE 공식
-│   ├── colorSpace.test.ts   # 색공간 및 표준 DeltaE 2000 검증 테스트
-│   ├── cubeState.ts         # 큐브 상태 + cubejs 솔버 래퍼
-│   └── cubeState.test.ts    # 상태 검증 및 솔버 테스트
+│   ├── opencvUtils.ts       # OpenCV.js 기반 큐브 윤곽/격자 검출
+│   ├── opencvUtils.test.ts  # OpenCV 유틸리티 단위 테스트
+│   ├── colorDetector.ts     # RGB → Lab → 6색 분류 및 캘리브레이션
+│   ├── colorDetector.test.ts # 색 인식 알고리즘 테스트
+│   ├── colorSpace.ts        # sRGB-Lab 변환 및 DeltaE 2000 공식
+│   ├── colorSpace.test.ts   # 색공간 변환 정확도 검증
+│   ├── cubeState.ts         # 큐브 상태 관리 및 cubejs 솔버 연동
+│   └── cubeState.test.ts    # 상태 유효성 및 솔버 로직 테스트
 ├── styles/
 │   └── global.css
 ├── types/
-│   └── cubejs.d.ts          # cubejs 라이브러리 타입 정의
-├── App.tsx                  # 전체 흐름 제어 (state machine)
+│   └── cubejs.d.ts          # 라이브러리 타입 정의
+├── App.tsx                  # 전역 상태 및 라우팅 (State Machine)
 └── main.tsx
 ```
 
